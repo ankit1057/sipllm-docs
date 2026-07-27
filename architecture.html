@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="architecture">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture book · SipLLM docs</title>
+<meta name="description" content="This is the map. SipLLM is a layered stack with one load-bearing seam — the WeightSource — that lets the transformer run identical math whether weights come …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html" class="active" aria-current="page">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Architecture <span aria-hidden="true">/</span> Overview</div>
+      <h1>Architecture book</h1>
+      <div class="callout note"><div class="callout-title">How to read this section</div><p>This is the map. SipLLM is a layered stack with one load-bearing seam — the <code>WeightSource</code> — that lets the transformer run identical math whether weights come from a real GGUF, a toy <code>.llmw</code>, resident RAM, or streamed off disk. Each card below is a chapter; start with the <a href="streaming-loader.html">streaming layer loader</a> if you want the central idea first.</p></div>
+<h2 id="the-stack">The stack</h2>
+<p>Bottom to top, every layer talks only to the one beneath it. The seam is <code>WeightSource</code> (<code>include/llm/weight_source.h</code>): a tensor directory, typed metadata, and positional <code>read_raw</code>/<code>read_raw_at</code> reads. Swapping the loader, the residency strategy, or the on-disk format touches no line of transformer math.</p>
+<pre><code class="language-text">                    ┌──────────────────────────────────────────┐
+   feeds config &amp;   │  Runtime  (open_model → cfg → generate)   │  src/runtime.cpp
+   tokens into ───▶ │  KV cache · sampler · stats               │
+                    └────────────────────┬─────────────────────┘
+                                         │
+                    ┌────────────────────▼─────────────────────┐
+                    │  Transformer  (per-block forward pass)    │  src/transformer.cpp
+                    └────────────────────┬─────────────────────┘
+                                         │  loadLayer(L) / unloadLayer()
+                    ┌────────────────────▼─────────────────────┐
+                    │  LayerLoader  (slots · roles · residency  │  src/loader.cpp
+                    │  · async prefetch ring)                   │
+                    └────────────────────┬─────────────────────┘
+                                         │  read_raw / read_raw_at (pread or mmap-memcpy)
+                    ┌────────────────────▼─────────────────────┐
+                    │  WeightSource seam                        │  include/llm/weight_source.h
+                    │    GgufFile (.gguf)  ·  ModelFile (.llmw)  │  src/gguf.cpp · src/format.cpp
+                    └───────────────────────────────────────────┘
+
+   underneath everything:  ThreadPool · Quant/dequant kernels · SIMD (NEON/SDOT)
+   off to the side:        Device profile + Auto-tuner (thread count &amp; scheduler)</code></pre>
+<p><code>GGUF</code> parsing and the <code>Tokenizer</code> feed this stack from the left — GGUF metadata becomes the <code>ModelConfig</code> and the tokenizer vocab; both are built once through the same <code>WeightSource</code>. The compute floor (<code>ThreadPool</code>, quant kernels, SIMD) and the device/auto-tune path sit underneath as shared services.</p>
+<h2 id="the-forward-pass-in-one-line">The forward pass in one line</h2>
+<p><code>embed_token → for L in 0..n_layers: loadLayer(L) · RMSNorm · QKV · RoPE · GQA attention · out-proj · RMSNorm · SwiGLU · unloadLayer() → final RMSNorm · project_output → logits</code> — and only <strong>one block&#x27;s weights are resident at a time</strong> unless you pin more with <code>--ram-budget</code>.</p>
+<h2 id="chapters">Chapters</h2>
+<div class="card-grid"><div class="card"><h3>Streaming layer loader</h3><p>The seam that makes memory track <em>layer</em> size, not model size. <a href="streaming-loader.html">Read →</a></p></div><div class="card"><h3>Layer residency</h3><p>Pinned vs streamed layers and the quantized-vs-fp32 residency modes. <a href="layer-residency.html">Read →</a></p></div><div class="card"><h3>Memory planner</h3><p>The <code>--ram-budget</code> contract planner that pins hot layers under a hard peak-RSS ceiling. <a href="memory-planner.html">Read →</a></p></div><div class="card"><h3>Predictive prefetch</h3><p>The async double-buffered ring that materializes block <code>L+1</code> while block <code>L</code> computes. <a href="prefetch.html">Read →</a></p></div><div class="card"><h3>Runtime</h3><p>Owns the whole stack: <code>open_model</code> → <code>ModelConfig</code> → KV cache → sampler → generate loop. <a href="runtime.html">Read →</a></p></div><div class="card"><h3>Transformer</h3><p>The block math: RMSNorm, GQA attention, RoPE, SwiGLU, per-arch dispatch across nine architectures. <a href="transformer.html">Read →</a></p></div><div class="card"><h3>KV cache</h3><p>Grow-on-demand key/value storage sized to the actual sequence, not the context ceiling. <a href="kv-cache.html">Read →</a></p></div><div class="card"><h3>Quantization</h3><p>Per-row dequantize-then-dot, K-quant NEON fast paths, and the Q8_0 int8 SDOT <code>--fast</code> kernel. <a href="quantization.html">Read →</a></p></div><div class="card"><h3>GGUF parser</h3><p>The real GGUF v2/v3 reader (and its <code>.llmw</code> sibling) behind the <code>WeightSource</code> seam. <a href="gguf-parser.html">Read →</a></p></div><div class="card"><h3>Tokenizer</h3><p>One tokenizer, three kinds — Byte, SentencePiece, byte-level BPE — all built from GGUF metadata. <a href="tokenizer.html">Read →</a></p></div><div class="card"><h3>Thread pool</h3><p>The pthread work-sharing pool and its schedule policies that parallelize every matmul. <a href="thread-pool.html">Read →</a></p></div><div class="card"><h3>Auto-tuning</h3><p>Micro-benchmarks that pick thread count and scheduler per machine, cached under <code>~/.sipllm</code>. <a href="auto-tuning.html">Read →</a></p></div><div class="card"><h3>Flutter runtime</h3><p>The FFI bridge and Dart SDK that turn the engine into an offline on-device runtime. <a href="flutter-runtime.html">Read →</a></p></div><div class="card"><h3>Wear support</h3><p>Bringing the streaming runtime down to a watch-class device. <a href="wear-support.html">Read →</a></p></div></div>
+<h2 id="where-to-go-next">Where to go next</h2>
+<p>New to the thesis? Read <a href="why-streaming.html">Why streaming?</a> and the <a href="j-streaming-layers.html">streaming-layers journal</a>. Want the measured payoff? See <a href="benchmarks.html">Benchmarks</a>. Building on the engine? Jump to the <a href="api.html">API reference</a>.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="faq.html"><span>Previous</span>FAQ</a><a class="pn next" href="streaming-loader.html"><span>Next</span>Streaming loader</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-stack">The stack</a></li><li class="toc-h2"><a href="#the-forward-pass-in-one-line">The forward pass in one line</a></li><li class="toc-h2"><a href="#chapters">Chapters</a></li><li class="toc-h2"><a href="#where-to-go-next">Where to go next</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

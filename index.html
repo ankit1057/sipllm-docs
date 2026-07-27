@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="index">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SipLLM · SipLLM docs</title>
+<meta name="description" content="Start anywhere: The one idea The usual way to run an LLM loads the entire model into memory. A 1.1&amp;nbsp;B model in Q8_0 is ~1.1&amp;nbsp;GB resident; an 8&amp;nbsp;B…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html" class="active" aria-current="page">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page home">
+      <div class="breadcrumb">Product <span aria-hidden="true">/</span> Overview</div>
+      <h1>SipLLM</h1>
+      <div class="hero"><p class="lead"><strong>Run GGUF models larger than available RAM through bounded-memory transformer&nbsp;layer&nbsp;streaming.</strong> SipLLM is a dependency-free, CPU-first LLM inference engine in C++17 that <em>sips</em> weights off disk one transformer block at a time, so peak memory tracks a single resident layer — not the whole model. A Flutter/Android SDK turns that runtime into an offline AI computer you carry in your pocket.</p><div class="hero-cta"><a class="btn primary" href="why-streaming.html">Why streaming? &#8594;</a><a class="btn ghost" href="architecture.html">Architecture book</a><a class="btn ghost" href="benchmarks.html">Measured numbers</a></div></div>
+<p>Start anywhere:</p>
+<div class="flow"><a href="architecture.html">Architecture</a><span class="arrow">&#8595;</span><a href="j-streaming-layers.html">Streaming thesis</a><span class="arrow">&#8595;</span><a href="benchmarks.html">Benchmarks</a><span class="arrow">&#8595;</span><a href="api.html">API</a><span class="arrow">&#8595;</span><a href="flutter-runtime.html">Flutter</a><span class="arrow">&#8595;</span><a href="j-android.html">Android</a><span class="arrow">&#8595;</span><a href="vision.html">Playground</a><span class="arrow">&#8595;</span><a href="contributing.html">Contributing</a></div>
+<h2 id="the-one-idea">The one idea</h2>
+<p>The usual way to run an LLM loads the entire model into memory. A 1.1&nbsp;B model in Q8_0 is ~1.1&nbsp;GB resident; an 8&nbsp;B model will not fit on a phone at all. SipLLM instead streams one transformer block at a time: <code>pread</code> the block&#x27;s weights from disk, run attention + FFN, free it, move on. Only a single layer&#x27;s weights (plus the KV cache) are ever resident, so a model many times larger than RAM still runs — <strong>memory is bounded by <em>layer</em> size, not <em>model</em> size.</strong></p>
+<div class="callout key"><div class="callout-title">Central hypothesis</div><p><em>&quot;LLM inference should be bounded by a configurable working set rather than total model size.&quot;</em> SipLLM is not trying to replace llama.cpp — it exists to prove a different execution model, and every number here is measured against llama.cpp on the same hardware.</p></div>
+<h2 id="measured-not-claimed">Measured, not claimed</h2>
+<p>Apple M3, CPU-only, warm cache, median-of-3; peak RSS from <code>/usr/bin/time -l</code> (the authoritative cross-runtime figure). Reproducible and committed as JSON under <code>bench/results/</code>.</p>
+<div class="stat-grid"><div class="stat"><div class="stat-value">317 MB</div><div class="stat-label">peak RSS to run Llama-2-13B</div><div class="stat-sub">7.87 GB Q4 weights &rarr; 25&times; smaller than the model</div></div><div class="stat"><div class="stat-value">2.1&times;</div><div class="stat-label">less RAM than llama.cpp</div><div class="stat-sub">at ~88% of its decode (TinyLlama Q8, resident)</div></div><div class="stat"><div class="stat-value">13&times;</div><div class="stat-label">less RAM, streaming</div><div class="stat-sub">same TinyLlama in 175 MB vs 2326 MB</div></div><div class="stat"><div class="stat-value">0</div><div class="stat-label">runtime dependencies</div><div class="stat-sub">standard C++17 + pthreads only</div></div></div>
+<h3 id="bigger-than-ram-the-defining-capability">Bigger than RAM — the defining capability</h3>
+<p>Measured on a 16&nbsp;GB Mac with only ~3&nbsp;GB free, where loading these models resident is impossible (<code>--stream-lm-head --no-async --ctx 512</code>, greedy):</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Weights on disk</th><th class="a-right">Peak RSS</th><th class="a-right">Model ÷ RSS</th><th class="a-left">Output</th></tr></thead><tbody><tr><td class="a-left">TinyLlama-1.1B (Q8_0)</td><td class="a-right">1.17 GB</td><td class="a-right">61 MB</td><td class="a-right">19×</td><td class="a-left">coherent</td></tr><tr><td class="a-left">Llama-3.1-8B (Q4_K_M)</td><td class="a-right">4.92 GB</td><td class="a-right">204 MB</td><td class="a-right">24×</td><td class="a-left">coherent</td></tr><tr><td class="a-left">Llama-2-13B (Q4_K_M)</td><td class="a-right">7.87 GB</td><td class="a-right">317 MB</td><td class="a-right">25×</td><td class="a-left">coherent</td></tr></tbody></table></div>
+<p>Peak RSS grows with layer <em>width</em>, never model depth/total size — a deeper model of the same width has flat peak RSS.</p>
+<h3 id="half-the-ram-comparable-speed">Half the RAM, comparable speed</h3>
+<p>TinyLlama-1.1B Q8_0, <code>--ctx 512</code>, greedy, 4 threads, warm cache:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Runtime</th><th class="a-right">Peak RSS</th><th class="a-right">Decode</th><th class="a-left">vs llama.cpp</th></tr></thead><tbody><tr><td class="a-left">llama.cpp (CPU, <code>-ngl 0 -t 4</code>)</td><td class="a-right">2326 MB</td><td class="a-right">~57 tok/s</td><td class="a-left">baseline</td></tr><tr><td class="a-left"><strong>SipLLM</strong> <code>--fast --ram-budget 1200M</code> (resident)</td><td class="a-right">1113 MB</td><td class="a-right">~50 tok/s</td><td class="a-left"><strong>2.1× less RAM</strong>, ~12% slower</td></tr><tr><td class="a-left"><strong>SipLLM</strong> <code>--fast</code> (streaming)</td><td class="a-right">175 MB</td><td class="a-right">6.8 tok/s</td><td class="a-left"><strong>13.3× less RAM</strong></td></tr></tbody></table></div>
+<p>It is a smooth RAM↔speed dial, not a fixed point. Output is numerically equivalent — see <a href="benchmarks.html">Benchmarks &amp; validation</a> for the layer-by-layer diff against llama.cpp.</p>
+<h2 id="what-is-inside">What is inside</h2>
+<div class="card-grid"><div class="card"><h3>Real GGUF parser</h3><p>Loads unmodified GGUF v2/v3 files from Hugging Face — metadata, tensor directory, and the common quantizations.</p></div><div class="card"><h3>Streaming layer loader</h3><p>Synchronous <code>pread</code>, an async double-buffered prefetcher, or an <code>mmap</code> backend — switchable and benchmarked side by side.</p></div><div class="card"><h3>RAM↔speed dial</h3><p><code>--ram-budget</code> pins as many hot layers as fit under a hard peak-RSS ceiling and streams the rest. Output is bit-identical at any budget.</p></div><div class="card"><h3>Nine architectures</h3><p>Llama, Mistral, Qwen2/2.5, Gemma&nbsp;2, Gemma&nbsp;3 text, Phi-3, Phi-2, GPT-2, and Mixtral/MoE — dispatched on <code>general.architecture</code>.</p></div><div class="card"><h3>ARM64 NEON kernels</h3><p><code>sdot</code>-accelerated int8 matmul with an x86 AVX2/FMA path and scalar fallbacks everywhere else.</p></div><div class="card"><h3>Flutter / Android SDK</h3><p>A stable C ABI wraps the engine; a Dart isolate streams tokens to a phone &amp; Wear OS UI with downloads, embeddings, and benchmarks — all offline.</p></div></div>
+<h2 id="quick-start">Quick start</h2>
+<pre><code class="language-bash"># one-liner installer (prebuilt release, or builds from source)
+curl -fsSL https://raw.githubusercontent.com/ankit1057/sipllm/main/install.sh | sh
+sipllm run tinyllama -p &quot;The capital of France is&quot;
+
+# from source — the entire toolchain is make + a C++17 compiler
+git clone https://github.com/ankit1057/sipllm.git &amp;&amp; cd sipllm
+make            # -&gt; build/llm, build/bench, build/inspect_gguf, ...
+make test       # dependency-free unit suite, all green
+
+# run a model bigger than your RAM
+./build/llm model.gguf -p &quot;prompt&quot; -n 40 --stream-lm-head --no-async
+./build/llm model.gguf -p &quot;prompt&quot; --ram-budget 512M   # cap peak RSS</code></pre>
+<div class="callout note"><div class="callout-title">Where to go next</div><p>New here? Read <a href="what-is-sipllm.html">What is SipLLM?</a> and <a href="why-streaming.html">Why streaming?</a>. Want the mechanics? The <a href="architecture.html">Architecture book</a> is a module-by-module tour, and the <a href="journal.html">Engineering journal</a> tells the story behind each optimization. Building on it? Jump to the <a href="api.html">API reference</a>.</p></div>
+      <nav class="page-footer-nav"><span class="pn"></span><a class="pn next" href="what-is-sipllm.html"><span>Next</span>What is SipLLM?</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-one-idea">The one idea</a></li><li class="toc-h2"><a href="#measured-not-claimed">Measured, not claimed</a></li><li class="toc-h3"><a href="#bigger-than-ram-the-defining-capability">Bigger than RAM — the defining capability</a></li><li class="toc-h3"><a href="#half-the-ram-comparable-speed">Half the RAM, comparable speed</a></li><li class="toc-h2"><a href="#what-is-inside">What is inside</a></li><li class="toc-h2"><a href="#quick-start">Quick start</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

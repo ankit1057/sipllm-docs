@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="benchmarks">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benchmarks &amp;amp; validation · SipLLM docs</title>
+<meta name="description" content="These are measured on host (Apple M3). Android on-device numbers are pending — the Flutter/FFI layer (Wave 8) is host-verified only. No phone/watch figure is…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html" class="active" aria-current="page">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Product <span aria-hidden="true">/</span> Benchmarks</div>
+      <h1>Benchmarks &amp; validation</h1>
+      <div class="hero"><p class="lead"><strong>Correctness is a measurement, not a claim; footprint is a measurement, not a claim.</strong> Every number here is Apple M3, CPU-only, warm cache, median-of-3, measured 2026-07-27. Peak RSS is the authoritative cross-runtime figure from <code>/usr/bin/time -l</code>. All figures are committed as JSON under <code>bench/results/</code>.</p></div>
+<div class="callout measured"><div class="callout-title">Host, not device</div><p>These are measured on <strong>host (Apple M3)</strong>. Android on-device numbers are <strong>pending</strong> — the Flutter/FFI layer (Wave 8) is host-verified only. No phone/watch figure is quoted anywhere in these docs because none has been measured yet.</p></div>
+<h2 id="north-star-scorecard">North Star scorecard</h2>
+<p>The project&#x27;s single measured source of truth, refreshed at the end of every optimization wave (charter Rule 1):</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Metric</th><th class="a-left">Value</th></tr></thead><tbody><tr><td class="a-left">Peak RSS — tinyllama</td><td class="a-left">121 MB (stream) … 644 MB (fully resident)</td></tr><tr><td class="a-left">Peak RSS — smollm2</td><td class="a-left">54 MB (stream) … 161 MB (fully resident)</td></tr><tr><td class="a-left">vs llama.cpp CPU</td><td class="a-left">1356 MB (tinyllama) / 546 MB (smollm2) → <strong>10–11× smaller at min budget</strong></td></tr><tr><td class="a-left">Resident weights</td><td class="a-left">FLAT ~1.5 MB across toy 4/16/32 layers; real 37.6 MB (smollm2 1-layer) / 106.5 MB (tinyllama 1-layer); pinned dial up to 143 MB (smollm2) / 630 MB (tinyllama)</td></tr><tr><td class="a-left">Decode tok/s (Q8 <code>--fast</code>, resident)</td><td class="a-left">smollm2 62→171 · tinyllama 50 (vs llama.cpp 57)</td></tr><tr><td class="a-left">Decode tok/s (RAM-budget dial, exact fp32)</td><td class="a-left">smollm2 53→66 · tinyllama 11→22</td></tr><tr><td class="a-left">TTFT</td><td class="a-left">smollm2 ~0.10 s · tinyllama ~0.68 s (vs llama.cpp 0.003 / 0.021 s)</td></tr><tr><td class="a-left">Prefill throughput</td><td class="a-left">smollm2 50–67 · tinyllama 7–23 tok/s (vs llama.cpp 1680 / 238)</td></tr><tr><td class="a-left">Expansion factor (disk ÷ peak-RSS, min budget)</td><td class="a-left">2.7× (smollm2) · 5.5× (tinyllama)</td></tr><tr><td class="a-left">Largest runnable</td><td class="a-left">Llama-2-13B (7.87 GB Q4) in <strong>317 MB (25×)</strong>; Llama-3.1-8B (4.92 GB Q4) in 204 MB (24×)</td></tr><tr><td class="a-left">Energy / token</td><td class="a-left"><strong>N/A</strong> (needs <code>sudo powermetrics</code>; never fabricated)</td></tr></tbody></table></div>
+<div class="callout note"><div class="callout-title">Read the trade honestly</div><p>SipLLM is <em>not</em> uniformly faster. TTFT and prefill throughput trail llama.cpp substantially — streaming trades disk bandwidth for a bounded footprint. The headline is RAM, and the ability to run models that do not fit at all.</p></div>
+<h2 id="bigger-than-ram-the-defining-capability">Bigger than RAM — the defining capability</h2>
+<p>16&nbsp;GB Mac, ~3&nbsp;GB free (loading these resident is impossible), <code>--stream-lm-head --no-async --ctx 512</code>, greedy:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Weights on disk</th><th class="a-right">Peak RSS</th><th class="a-right">Model ÷ RSS</th></tr></thead><tbody><tr><td class="a-left">TinyLlama-1.1B Q8_0</td><td class="a-right">1.17 GB</td><td class="a-right">61 MB</td><td class="a-right">19×</td></tr><tr><td class="a-left">Llama-3.1-8B Q4_K_M</td><td class="a-right">4.92 GB</td><td class="a-right">204 MB</td><td class="a-right">24×</td></tr><tr><td class="a-left">Llama-2-13B Q4_K_M</td><td class="a-right">7.87 GB</td><td class="a-right">317 MB</td><td class="a-right">25×</td></tr></tbody></table></div>
+<p>Peak RSS grows with layer <em>width</em>, never model depth/total size. See <a href="j-bigger-than-ram.html">Bigger than RAM</a>.</p>
+<h2 id="half-the-ram-comparable-speed">Half the RAM, comparable speed</h2>
+<p>TinyLlama-1.1B Q8_0, <code>--ctx 512</code>, greedy, 4 threads, warm cache:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Runtime</th><th class="a-right">Peak RSS</th><th class="a-right">Decode</th></tr></thead><tbody><tr><td class="a-left">llama.cpp (CPU)</td><td class="a-right">2326 MB</td><td class="a-right">~57 tok/s</td></tr><tr><td class="a-left">SipLLM <code>--fast --ram-budget 1200M</code> (resident)</td><td class="a-right">1113 MB</td><td class="a-right">~50 tok/s</td></tr><tr><td class="a-left">SipLLM <code>--fast</code> (streaming)</td><td class="a-right">175 MB</td><td class="a-right">6.8 tok/s</td></tr></tbody></table></div>
+<p>2.1× less RAM at ~88% of llama.cpp&#x27;s decode, or 13× less RAM streaming — a smooth <a href="why-streaming.html">RAM↔speed dial</a>, not a fixed point.</p>
+<h2 id="golden-validation-vs-llama-cpp">Golden validation vs llama.cpp</h2>
+<p>For the same model and prompt, SipLLM dumps every transformer block&#x27;s residual stream and the final logits and diffs them against llama.cpp&#x27;s own values (captured through its eval callback). <strong>Cross-engine outputs are never bit-exact</strong> — summation order and rounding differ — so the comparison is numerical: per-layer <code>max|Δ|</code>, cosine similarity, and argmax/top-k agreement.</p>
+<p>Prompt <code>&quot;The capital of France is&quot;</code> → both engines greedily predict <code>&quot; Paris&quot;</code> (TinyLlama-1.1B, 22 layers, dim 2048, GQA 32/4):</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Format</th><th class="a-right">worst layer max\</th><th class="a-right">Δ\</th><th class="a-right"></th><th class="a-center">final logit max\</th><th class="a-center">Δ\</th><th class="a-right"></th><th class="a-center">final cosine</th><th>top-10</th><th>argmax</th><th>peak RSS</th><th>result</th></tr></thead><tbody><tr><td class="a-left">F16</td><td class="a-right">4.45e-03</td><td class="a-right">5.76e-03</td><td class="a-right">1.000000</td><td class="a-center">10/10</td><td class="a-center">✓</td><td class="a-right">412 MB</td><td class="a-center">PASS</td></tr><tr><td class="a-left">Q8_0</td><td class="a-right">1.79e-01</td><td class="a-right">3.03e-01</td><td class="a-right">0.999925</td><td class="a-center">8/10</td><td class="a-center">✓</td><td class="a-right">269 MB</td><td class="a-center">PASS</td></tr><tr><td class="a-left">Q5_K_M</td><td class="a-right">2.37e-01</td><td class="a-right">4.40e-01</td><td class="a-right">0.999829</td><td class="a-center">10/10</td><td class="a-center">✓</td><td class="a-right">223 MB</td><td class="a-center">PASS</td></tr><tr><td class="a-left">Q4_K_M</td><td class="a-right">3.88e-01</td><td class="a-right">4.35e-01</td><td class="a-right">0.999823</td><td class="a-center">10/10</td><td class="a-center">✓</td><td class="a-right">215 MB</td><td class="a-center">PASS</td></tr></tbody></table></div>
+<p>Two things fall straight out, both exactly what theory predicts:</p>
+<ol><li><strong>F16 is numerically identical to llama.cpp</strong> (cosine <code>1.000000</code>) — the compute graph is correct; every residual difference in the quantized rows is pure quantization error.</li><li><strong>Error grows monotonically as quantization coarsens</strong> (F16 ≪ Q8_0 &lt; Q5_K_M &lt; Q4_K_M). A bug would produce erratic, layer-localized divergence; this smooth accumulation is the signature of a faithful implementation.</li></ol>
+<p>The golden matrix currently covers the Llama path; newer architectures are unit-tested and validated against llama.cpp as models are added. See <a href="quantization.html">Quantization</a> and the <a href="j-lm-head.html">LM-head journal</a>.</p>
+<h2 id="ram-budget-sweep">RAM-budget sweep</h2>
+<p><code>bench_ram_budget.sh</code>, M3, warm, ctx 512:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Budget</th><th class="a-right">Pinned</th><th class="a-right">Decode tok/s</th><th class="a-right">Streamed</th><th class="a-right">Peak RSS</th></tr></thead><tbody><tr><td class="a-left">tinyllama</td><td class="a-right">0 (stream)</td><td class="a-right">0/22</td><td class="a-right">11.4</td><td class="a-right">14411 MB</td><td class="a-right">121 MB</td></tr><tr><td class="a-left">tinyllama</td><td class="a-right">512M</td><td class="a-right">13/22</td><td class="a-right">15.5</td><td class="a-right">6155 MB</td><td class="a-right">480 MB</td></tr><tr><td class="a-left">tinyllama</td><td class="a-right">768M</td><td class="a-right">22/22</td><td class="a-right">22.1</td><td class="a-right">576 MB</td><td class="a-right">644 MB</td></tr><tr><td class="a-left">smollm2</td><td class="a-right">0 (stream)</td><td class="a-right">0/30</td><td class="a-right">53.1</td><td class="a-right">2824 MB</td><td class="a-right">54 MB</td></tr><tr><td class="a-left">smollm2</td><td class="a-right">256M</td><td class="a-right">30/30</td><td class="a-right">65.9</td><td class="a-right">113 MB</td><td class="a-right">161 MB</td></tr></tbody></table></div>
+<p>Pinning is a pure cache: logits + KV are bit-identical across every budget, and peak RSS ≤ budget at every point. See <a href="memory-planner.html">Memory planner</a>.</p>
+<h2 id="streamed-lm-head">Streamed LM head</h2>
+<p>TinyLlama-1.1B Q4_K_M, M3, warm, t=4:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Mode</th><th class="a-right">Peak RSS</th><th class="a-right">Resident weights</th><th class="a-right">Decode</th></tr></thead><tbody><tr><td class="a-left">default (resident)</td><td class="a-right">121 MB</td><td class="a-right">106.5 MB</td><td class="a-right">11.48 tok/s</td></tr><tr><td class="a-left"><code>--stream-lm-head</code></td><td class="a-right">69 MB</td><td class="a-right">52.7 MB</td><td class="a-right">11.11 tok/s</td></tr></tbody></table></div>
+<p>Streaming the output projection nearly halves peak RSS for a negligible decode cost — the head is often the single largest tensor. See the <a href="j-lm-head.html">LM-head journal</a>.</p>
+<h2 id="methodology">Methodology</h2>
+<ul><li><strong>Peak RSS</strong> is read from <code>/usr/bin/time -l</code> (maximum resident set size) — the authoritative, cross-runtime figure, independent of any engine&#x27;s self-report.</li><li><strong>Median-of-3</strong> for every timing (TTFT, decode, prefill tok/s); <strong>warm cache</strong> so the file is in the page cache.</li><li><strong>Cross-engine correctness is numerical, not bit-exact</strong> — see the golden matrix above and <code>golden/README.md</code> for why (summation order + rounding differ between engines).</li><li><strong>Every report states</strong> model · quantization · RAM budget · hardware · compiler · commit SHA alongside the metrics, and compares against the previous baseline (charter Rule 1).</li></ul>
+<h2 id="reproduce-it">Reproduce it</h2>
+<pre><code class="language-bash"># peak RSS / TTFT / decode tok/s harness
+scripts/bench.sh
+
+# decode-tok/s + peak-RSS vs --ram-budget sweep
+scripts/bench_ram_budget.sh
+
+# cross-engine numerical validation vs llama.cpp
+python3 golden/validate_matrix.py --prompt &quot;The capital of France is&quot;
+
+# the dependency-free unit suite
+make test</code></pre>
+<p>Latest runs are committed under <code>bench/results/</code> (<code>demo-v0.4-*.json</code>, <code>bigger-than-ram-*.json</code>, <code>ram-budget-*.json</code>) with the full test log in <code>bench/results/test-results-2026-07-27.txt</code>. See the <a href="performance-history.html">performance history</a> for the wave-by-wave trend.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="roadmap.html"><span>Previous</span>Roadmap</a><a class="pn next" href="faq.html"><span>Next</span>FAQ</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#north-star-scorecard">North Star scorecard</a></li><li class="toc-h2"><a href="#bigger-than-ram-the-defining-capability">Bigger than RAM — the defining capability</a></li><li class="toc-h2"><a href="#half-the-ram-comparable-speed">Half the RAM, comparable speed</a></li><li class="toc-h2"><a href="#golden-validation-vs-llama-cpp">Golden validation vs llama.cpp</a></li><li class="toc-h2"><a href="#ram-budget-sweep">RAM-budget sweep</a></li><li class="toc-h2"><a href="#streamed-lm-head">Streamed LM head</a></li><li class="toc-h2"><a href="#methodology">Methodology</a></li><li class="toc-h2"><a href="#reproduce-it">Reproduce it</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

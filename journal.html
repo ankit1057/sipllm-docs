@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="journal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engineering journal · SipLLM docs</title>
+<meta name="description" content="Every number in these articles is measured, not projected. This is the story behind SipLLM&amp;#x27;s memory-bounded execution model, told one optimization at a …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html" class="active" aria-current="page">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Engineering journal <span aria-hidden="true">/</span> Overview</div>
+      <h1>Engineering journal</h1>
+      <p><strong>Every number in these articles is measured, not projected.</strong> This is the story behind SipLLM&#x27;s memory-bounded execution model, told one optimization at a time: the problem we hit in the streaming context, the change we made, and the before/after we measured on an Apple&nbsp;M3 (CPU-only, warm cache, median-of-3). Read the <a href="architecture.html">Architecture book</a> for the module-by-module reference; read these to understand <em>why</em> each piece exists.</p>
+<h2 id="the-optimizations">The optimizations</h2>
+<div class="card-grid"><div class="card"><h3><a href="j-streaming-layers.html">Streaming the layers</a></h3><p>The founding seam: <code>WeightSource</code> + per-layer residency + per-row dequant, so peak RSS tracks a layer's <em>width</em>, not the model's <em>depth</em>.</p></div><div class="card"><h3><a href="j-bigger-than-ram.html">Running bigger than RAM</a></h3><p>Llama-2-13B (7.87&nbsp;GB Q4) generating coherent text in 317&nbsp;MB &mdash; 25&times; smaller than the file &mdash; on a Mac with ~3&nbsp;GB free.</p></div><div class="card"><h3><a href="j-lm-head.html">Streaming the LM head</a></h3><p>The non-tied output projection was a fixed RSS floor. Streaming it in 1024-row blocks cut peak RSS 43% for a 3% decode cost.</p></div><div class="card"><h3><a href="j-prefill.html">Single-pass prefill</a></h3><p>Naive prefill re-streamed the whole model once per prompt token. Batching over positions streams each layer once &mdash; 18&times; fewer bytes, bit-identical output.</p></div><div class="card"><h3><a href="j-prefetch.html">Predictive prefetch</a></h3><p>An async double-buffer ring loads block <code>L+1</code> while the compute thread runs block <code>L</code>, hiding I/O behind arithmetic. Three backends, identical logits.</p></div><div class="card"><h3><a href="j-resident-weights.html">Flat resident weights</a></h3><p>Why weight RAM stays flat as models get deeper: quantized residency + fused per-row dequant hold a layer at ~4 bits/weight instead of 32.</p></div><div class="card"><h3><a href="j-q4k.html">The Q4_K kernel</a></h3><p>Dequantizing K-quant super-blocks a row at a time, with a NEON fast path.</p></div><div class="card"><h3><a href="j-gguf.html">Parsing GGUF</a></h3><p>Reading unmodified Hugging Face GGUF v2/v3 files with zero dependencies.</p></div><div class="card"><h3><a href="j-peak-rss.html">Measuring peak RSS</a></h3><p>Why <code>/usr/bin/time -l</code> is the authoritative cross-runtime figure, and how the internal counter tracks it.</p></div><div class="card"><h3><a href="j-android.html">Onto the phone</a></h3><p>The Flutter/Android SDK &mdash; host-verified, not yet on-device &mdash; that turns the runtime into a pocket AI computer.</p></div></div>
+<div class="callout note"><div class="callout-title">Where these fit</div><p>The founding thesis is <a href="j-streaming-layers.html">Streaming the layers</a>; its headline payoff is <a href="j-bigger-than-ram.html">Running bigger than RAM</a>. Each article links back to the matching page in the <a href="architecture.html">Architecture book</a>.</p></div>
+      <nav class="page-footer-nav"><a class="pn prev" href="api-dart.html"><span>Previous</span>Dart / Flutter</a><a class="pn next" href="j-streaming-layers.html"><span>Next</span>How SipLLM streams layers</a></nav>
+    </article>
+    <aside class="toc"></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

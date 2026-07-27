@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="auto-tuning">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto-tuning · SipLLM docs</title>
+<meta name="description" content="Problem → Design → Alternatives → Tradeoffs → Source → Future. The auto-tuner picks two runtime knobs per machine — thread count and scheduler policy — from …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html" class="active" aria-current="page">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Architecture <span aria-hidden="true">/</span> Auto-tuning</div>
+      <h1>Auto-tuning</h1>
+      <div class="callout note"><div class="callout-title">Architecture book</div><p><strong>Problem → Design → Alternatives → Tradeoffs → Source → Future.</strong> The auto-tuner picks two runtime knobs per machine — thread count and scheduler policy — from a one-time matmul micro-benchmark, then caches the result. It does <strong>not</strong> choose the RAM budget; that is the <a href="memory-planner.html">memory planner</a>&#x27;s job.</p></div>
+<h2 id="problem">Problem</h2>
+<p>The right thread count for a memory-bound matmul is not &quot;all cores&quot; — past a point, more threads just contend for memory bandwidth and the barrier cost dominates. The right value depends on the machine and cannot be guessed from core count alone. Likewise the <a href="thread-pool.html">thread pool</a> has several work-splitting policies whose best choice varies by hardware. Rather than ship a fixed default or make the user tune by hand, SipLLM measures the machine once and remembers the answer.</p>
+<h2 id="design">Design</h2>
+<p>Two pieces: hardware detection (<code>include/llm/device_profile.h</code>, <code>src/device_profile.cpp</code>) and the tuner (<code>include/llm/auto_tuner.h</code>, <code>src/auto_tuner.cpp</code>).</p>
+<h3 id="hardware-detection">Hardware detection</h3>
+<p><code>get_hardware_info()</code> reads static traits from the OS — CPU model, logical/physical cores, RAM bytes, page size, architecture:</p>
+<ul><li><strong>macOS</strong> via <code>sysctlbyname</code> (<code>machdep.cpu.brand_string</code>, <code>hw.logicalcpu</code>, <code>hw.physicalcpu</code>, <code>hw.memsize</code>, <code>hw.pagesize</code>).</li><li><strong>Linux</strong> via <code>/proc/cpuinfo</code>, <code>sysconf(_SC_NPROCESSORS_ONLN)</code>, <code>lscpu</code>, and <code>_SC_PHYS_PAGES × _SC_PAGE_SIZE</code>.</li><li><strong>Otherwise</strong> <code>std::thread::hardware_concurrency()</code> as a floor.</li></ul>
+<p><code>HardwareInfo::hardware_id()</code> collapses those into a deterministic slug — architecture, cleaned CPU model, logical core count, and RAM in GB (e.g. <code>arm64_apple_m3_8c_16gh</code>) — which keys the cache so a profile from one machine never loads on another.</p>
+<h3 id="the-tuner">The tuner</h3>
+<p><code>tune_if_needed(hw, opt)</code> is the entry point:</p>
+<pre><code class="language-text">tune_if_needed(hw, opt):
+    if opt.disable_autotune:                 return defaults (threads=4, policy=0)
+    if !force_recalibrate and cached profile exists for hw_id:
+                                             return cached profile
+    profile = run_micro_benchmarks(hw)
+    save to ~/.sipllm/runtime/&lt;hw_id&gt;.json
+    return profile</code></pre>
+<p><code>run_micro_benchmarks</code> runs a <strong>4096×4096 fp32 matmul</strong> — sized to mimic an 8B-Llama3 projection — under different configurations, timing iterations into a pseudo-tokens/sec score:</p>
+<ol><li><strong>Thread count.</strong> A narrowing search over candidates drawn from <code>logical_cores</code>, <strong>capped at 16</strong> (diminishing returns past that for a memory-bound workload). For ≤4 cores it tries every count; for more it probes <code>{1, 2, max/2, max}</code> then optionally refines around the winner. Measured under a fixed baseline policy.</li><li><strong>Scheduler policy.</strong> With the winning thread count fixed, it benchmarks a set of policies and keeps the fastest.</li></ol>
+<p>The chosen <code>threads</code> and <code>schedule_policy</code> are written to <code>~/.sipllm/runtime/&lt;hw_id&gt;.json</code> (under <code>get_sipllm_home()</code>, default <code>$HOME/.sipllm</code>), alongside the raw per-config measurements. The next run loads that file and skips the benchmark entirely.</p>
+<h3 id="cli-surface">CLI surface</h3>
+<ul><li><code>--no-autotune</code> — skip tuning, use defaults (<code>threads=4</code>, <code>policy=0</code>).</li><li><code>--recalibrate</code> — force a fresh benchmark even if a cached profile exists (also the only flag <code>bench_micro</code> accepts).</li><li><code>--profile-info</code> — print the detected <code>hardware_id</code> and the <code>HardwareInfo</code> JSON, then exit.</li></ul>
+<h2 id="caveats">Caveats</h2>
+<div class="callout warn"><div class="callout-title">What the auto-tuner does and does not do</div><ul><li><strong>It does not pick the RAM budget.</strong> Peak-RSS budgeting is the separate <code>mem_plan.cpp</code> contract planner behind <code>--ram-budget</code>; the tuner only touches thread count and scheduler.</li><li><strong>Only 4 of the 7 schedule policies are benchmarked</strong> — <code>Static</code>, <code>Fixed16</code>, <code>Proportional2</code>, <code>Adaptive</code>. The other policies exist in the pool but are never auto-selected.</li><li><strong>No big.LITTLE / core-cluster detection.</strong> It reads a single logical/physical core count and treats all cores as equivalent; it does not distinguish performance from efficiency cores.</li><li><strong><code>load_hardware_profile</code> is a no-op.</strong> It intentionally returns <code>false</code> without parsing — hardware re-detection is &lt;5 ms, so the <code>hardware.json</code> cache is never actually read back. Only the <em>runtime</em> profile (<code>runtime/&lt;hw_id&gt;.json</code>) is loaded.</li></ul></div>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Approach</th><th class="a-left">Why not</th></tr></thead><tbody><tr><td class="a-left">Fixed default thread count</td><td class="a-left">Wrong on most machines — either leaves cores idle or oversubscribes a bandwidth-bound kernel.</td></tr><tr><td class="a-left"><code>threads = logical_cores</code></td><td class="a-left">Past ~16 threads a memory-bound matmul regresses; the cap and search find the real peak.</td></tr><tr><td class="a-left">Tune on every launch</td><td class="a-left">The 4096² benchmark costs real time; caching per <code>hardware_id</code> pays it once.</td></tr><tr><td class="a-left">Benchmark all 7 policies</td><td class="a-left">Diminishing returns for extra launch cost; the 4 measured cover the useful spectrum.</td></tr><tr><td class="a-left">Parse <code>hardware.json</code> on load</td><td class="a-left">Detection is faster than parsing, so the read-back is deliberately skipped (<code>load_hardware_profile</code> returns <code>false</code>).</td></tr></tbody></table></div>
+<h2 id="tradeoffs">Tradeoffs</h2>
+<p>The tuner optimizes a <strong>proxy</strong> — a synthetic 4096² fp32 matmul — not the exact model you will run, so the picked thread count is a good default, not a per-model optimum. It also assumes homogeneous cores, which is imperfect on big.LITTLE ARM. In exchange it is cheap (one benchmark, then a cached JSON read), fully offline, and machine-scoped. Because it only sets thread count and scheduler, it can never affect correctness or memory footprint — those are owned by the loader and memory planner.</p>
+<h2 id="source-files">Source files</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">File</th><th class="a-left">Role</th></tr></thead><tbody><tr><td class="a-left"><code>include/llm/auto_tuner.h</code></td><td class="a-left"><code>tune_if_needed</code> / <code>run_micro_benchmarks</code> entry points, <code>AutoTunerOptions</code></td></tr><tr><td class="a-left"><code>src/auto_tuner.cpp</code></td><td class="a-left">4096² matmul micro-benchmark, thread-count search (cap 16), 4-policy scheduler selection</td></tr><tr><td class="a-left"><code>include/llm/device_profile.h</code></td><td class="a-left"><code>HardwareInfo</code> / <code>RuntimeProfile</code> structs, profile path helpers</td></tr><tr><td class="a-left"><code>src/device_profile.cpp</code></td><td class="a-left"><code>get_hardware_info()</code> (sysctl / <code>/proc</code>), <code>hardware_id()</code>, profile load/save, no-op <code>load_hardware_profile</code></td></tr><tr><td class="a-left"><code>tools/bench_micro.cpp</code></td><td class="a-left">standalone tuner runner (<code>--recalibrate</code>)</td></tr></tbody></table></div>
+<h2 id="future-work">Future work</h2>
+<ul><li><strong>big.LITTLE awareness</strong> — pin to performance cores or weight the thread search by cluster.</li><li><strong>Benchmark the remaining schedule policies</strong> and select from the full set.</li><li><strong>Model-aware tuning</strong> — benchmark at the actual model&#x27;s projection sizes instead of a fixed 4096².</li><li><strong>Wire up <code>load_hardware_profile</code></strong> or remove it — today it is a deliberate stub.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="thread-pool.html"><span>Previous</span>Thread pool</a><a class="pn next" href="flutter-runtime.html"><span>Next</span>Flutter runtime</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#problem">Problem</a></li><li class="toc-h2"><a href="#design">Design</a></li><li class="toc-h3"><a href="#hardware-detection">Hardware detection</a></li><li class="toc-h3"><a href="#the-tuner">The tuner</a></li><li class="toc-h3"><a href="#cli-surface">CLI surface</a></li><li class="toc-h2"><a href="#caveats">Caveats</a></li><li class="toc-h2"><a href="#alternatives-considered">Alternatives considered</a></li><li class="toc-h2"><a href="#tradeoffs">Tradeoffs</a></li><li class="toc-h2"><a href="#source-files">Source files</a></li><li class="toc-h2"><a href="#future-work">Future work</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

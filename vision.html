@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="vision">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vision — SipLLM Studio · SipLLM docs</title>
+<meta name="description" content="The runtime is real and measured. Most of the Studio surfaces below are product vision, not shipped code. Shipped surfaces are &amp;lt;span class=&amp;quot;badge on&amp;…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html" class="active" aria-current="page">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Product <span aria-hidden="true">/</span> Vision</div>
+      <h1>Vision — SipLLM Studio</h1>
+      <div class="hero"><p class="lead"><strong>SipLLM Studio is the offline AI computer: a six-surface workspace built entirely on top of the streaming runtime.</strong> Every screen exists to make one idea legible &mdash; running a model <em>under a hard memory budget</em>, larger than the RAM you have. This page describes the destination; badges mark what ships today versus what is planned.</p></div>
+<div class="callout warn"><div class="callout-title">Read the badges</div><p>The runtime is real and measured. Most of the <em>Studio</em> surfaces below are <strong>product vision, not shipped code.</strong> Shipped surfaces are &lt;span class=&quot;badge on&quot;&gt;shipped&lt;/span&gt;; planned ones are &lt;span class=&quot;badge no&quot;&gt;planned&lt;/span&gt;. Nothing here is measured on-device yet — the Flutter/FFI layer (Wave 8) is host-verified on Apple M3, <strong>not</strong> yet runtime-verified on a phone or watch.</p></div>
+<h2 id="the-guardrail">The guardrail</h2>
+<p>Every surface must reinforce the same thesis: <strong>streaming under a hard memory budget.</strong> That constraint is the product.</p>
+<div class="callout key"><div class="callout-title">Non-goals for Studio</div><p>Do <strong>not</strong> add new inference architectures or model families to chase feature parity. The engine&#x27;s architecture set (Llama, Mistral, Qwen2/2.5, Gemma&nbsp;2, Gemma&nbsp;3 text, Phi-3, Phi-2, GPT-2, Mixtral/MoE) is deliberate. Studio&#x27;s job is to <em>visualize and control</em> bounded-memory streaming, not to become a general model zoo.</p></div>
+<h2 id="the-six-surfaces">The six surfaces</h2>
+<div class="card-grid"><div class="card"><h3>Chat <span class="badge on">shipped</span></h3><p>Streamed token-by-token conversation on a worker isolate, cancellable mid-generate. The app applies the chat template itself (chatml/llama3/zephyr/raw) — the engine runs raw text and adds no template. Host-verified via the Dart&rarr;isolate&rarr;FFI path.</p></div><div class="card"><h3>Models <span class="badge on">shipped</span></h3><p>Model management + the resumable Hugging Face downloader (multi-connection HTTP Range, sidecar resume across restarts, sha256 verify). Backed by the device/engine capability dashboard.</p></div><div class="card"><h3>Bench <span class="badge on">shipped</span></h3><p>On-device benchmark surface over the runtime's own stats (TTFT, prefill/decode tok/s, byte/count fields). Note the Dart <code>SipllmStats</code> is a <em>subset</em> of the C struct — it drops the per-phase <code>load_s</code>/<code>prefill_s</code>/<code>decode_s</code> seconds.</p></div><div class="card"><h3>Play <span class="badge no">planned</span></h3><p>Offline HTML5 games in a WebView — the "AI computer" earns its keep even with no model loaded and no internet.</p></div><div class="card"><h3>Labs <span class="badge no">planned</span></h3><p>Experimental features behind a toggle, kept out of the way of the shipped surfaces until they are proven.</p></div><div class="card"><h3>Settings <span class="badge no">planned</span></h3><p>The RAM budget, thread count, scheduler policy, and backend selection — the dials that make bounded streaming tangible.</p></div></div>
+<h2 id="the-killer-surfaces-all-planned">The killer surfaces (all planned)</h2>
+<p>These are what make Studio <em>the offline AI computer</em> rather than another chat app. All are &lt;span class=&quot;badge no&quot;&gt;planned&lt;/span&gt;.</p>
+<div class="card-grid"><div class="card"><h3>AI Playground</h3><p>Live dials (<code>--ram-budget</code>, threads, scheduler) wired to real-time graphs of peak RSS and decode tok/s — the <a href="why-streaming.html">RAM&harr;speed dial</a> made visible as you drag it.</p></div><div class="card"><h3>Live Runtime Visualizer</h3><p>Per-token view of every layer's state: resident · pinned · streaming · loading · evicted. Watch the streaming window slide across the model as it generates — the streaming thesis rendered live.</p></div><div class="card"><h3>Storage Explorer</h3><p>Tap a tensor in the GGUF directory to see its dtype, byte size, file offset, and whether it is currently streamed or resident. The model's on-disk layout, browsable.</p></div><div class="card"><h3>Prompt Arena</h3><p>Run the same prompt across models/budgets side by side and compare output, footprint, and speed.</p></div><div class="card"><h3>AI Arcade</h3><p>The model plays games — a playful stress test of on-device generation that doubles as a demo.</p></div></div>
+<h2 id="why-a-workspace-not-just-a-chat-box">Why a workspace, not just a chat box</h2>
+<p>The engine&#x27;s most interesting properties — a flat resident footprint across depth, a hard budget you can drag, weights streaming layer by layer — are invisible in a plain chat UI. Studio&#x27;s surfaces exist to <em>show</em> them: the Visualizer proves peak RSS tracks layer width; the Playground proves the budget is a smooth dial; the Storage Explorer proves the model never fully materializes. Each is an argument for <a href="why-streaming.html">why streaming</a>, made interactive.</p>
+<div class="callout note"><div class="callout-title">Status, plainly</div><p>Shipped and host-verified (Apple M3, not on-device): the Chat / Models / Bench surfaces and the FFI + isolate + downloader + embedding-store path. Planned: Play, Labs, Settings, and every killer surface above. Android APK and Wear OS transfer are the remaining work of the current wave — see <a href="roadmap.html">Roadmap</a> and the <a href="j-android.html">Android journal</a>.</p></div>
+      <nav class="page-footer-nav"><a class="pn prev" href="why-another-runtime.html"><span>Previous</span>Why another runtime?</a><a class="pn next" href="roadmap.html"><span>Next</span>Roadmap</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-guardrail">The guardrail</a></li><li class="toc-h2"><a href="#the-six-surfaces">The six surfaces</a></li><li class="toc-h2"><a href="#the-killer-surfaces-all-planned">The killer surfaces (all planned)</a></li><li class="toc-h2"><a href="#why-a-workspace-not-just-a-chat-box">Why a workspace, not just a chat box</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

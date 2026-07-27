@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="glossary">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glossary · SipLLM docs</title>
+<meta name="description" content="The vocabulary SipLLM&amp;#x27;s docs and source use, defined precisely. Each term is grounded in the engine&amp;#x27;s behavior; where a term names a measured quant…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html" class="active" aria-current="page">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Project <span aria-hidden="true">/</span> Glossary</div>
+      <h1>Glossary</h1>
+      <p>The vocabulary SipLLM&#x27;s docs and source use, defined precisely. Each term is grounded in the engine&#x27;s behavior; where a term names a measured quantity, the measurement method is stated. Alphabetical.</p>
+<h2 id="decode">Decode</h2>
+<p>The autoregressive phase after <a href="glossary.html">prefill</a>: the model generates one token at a time, each pass appending a single position to the <a href="glossary.html">KV cache</a>. This is where streaming cost dominates, because every token re-streams the layers it does not have pinned — hence <a href="glossary.html">decode tok/s</a> is the headline throughput number.</p>
+<h2 id="expansion-factor">Expansion factor</h2>
+<p>Model size on disk ÷ peak RSS at the minimum (<a href="glossary.html">streaming</a>) budget — how many times larger than its resident footprint a model can be. Measured <strong>2.7×</strong> (smollm2) and <strong>5.5×</strong> (tinyllama); at the largest-runnable extreme, Llama-2-13B is <strong>25×</strong> its 317&nbsp;MB peak RSS.</p>
+<h2 id="gguf-tensor">GGUF tensor</h2>
+<p>A single named weight in a GGUF file — e.g. <code>blk.&lt;L&gt;.attn_q.weight</code> — with a dtype (often quantized), shape, and byte offset in the tensor directory. SipLLM&#x27;s <code>WeightSource</code> exposes this directory and reads a tensor&#x27;s raw bytes positionally (<code>pread</code>) without loading the whole file.</p>
+<h2 id="kv-cache">KV cache</h2>
+<p>The stored key/value projections for every past position, so attention need not recompute them. It grows with context length, so SipLLM allocates it <strong>grow-on-demand</strong> (RFC-003 / #35) instead of pre-sizing to <code>--ctx</code>, cutting peak RSS while staying bitwise-identical. See <a href="kv-cache.html">KV cache</a>.</p>
+<h2 id="layer-residency">Layer residency</h2>
+<p>Which transformer blocks are currently held in RAM. SipLLM keeps only a bounded set resident — in the extreme, exactly one streamed block — and the <a href="glossary.html">RAM budget</a> contract tunes how many. Residency is contiguous: layers <code>[0, n_pinned)</code>. See <a href="layer-residency.html">layer residency</a>.</p>
+<h2 id="peak-rss">Peak RSS</h2>
+<p>Peak resident set size — the maximum physical memory the process ever held. SipLLM treats the value from <strong><code>/usr/bin/time -l</code></strong> as authoritative because it is comparable across runtimes (independent of a runtime&#x27;s own accounting). It is the project&#x27;s primary success metric.</p>
+<h2 id="pinned-layer">Pinned layer</h2>
+<p>A transformer block the <a href="memory-planner.html">memory planner</a> keeps permanently resident (served with zero I/O) because it fit under the <a href="glossary.html">RAM budget</a>. Pinned layers are the leading contiguous run <code>[0, n_pinned)</code>; the rest are streamed. Pinning is a pure cache — it changes <em>where</em> bytes live, never the logits.</p>
+<h2 id="prefetch-hit-miss">Prefetch hit / miss</h2>
+<p>In the async double-buffered loader, a background worker materializes block <code>L+1</code> while the compute thread runs block <code>L</code>. A <strong>hit</strong> means <code>L+1</code> was ready when needed (compute never stalls on I/O); a <strong>miss</strong> means compute blocked waiting for the load. See <a href="prefetch.html">predictive prefetch</a>.</p>
+<h2 id="prefill">Prefill</h2>
+<p>The first forward pass over the whole prompt, populating the <a href="glossary.html">KV cache</a> for all prompt positions before <a href="glossary.html">decode</a> begins. SipLLM does this <strong>single-pass</strong> (RFC-007 / #36): it streams the model once for the entire prompt rather than once per prompt token, cutting streamed bytes by up to 18×. See the <a href="j-prefill.html">prefill journal</a>.</p>
+<h2 id="quant-block">Quant block</h2>
+<p>The fixed-size group of weights a quantization format encodes together (with shared scale/zero-point metadata). SipLLM&#x27;s fused <code>matmul_quant</code> dequantizes <em>one output row&#x27;s</em> blocks into a tiny scratch buffer and dots them with the activation, so a whole layer stays quantized in RAM instead of expanding to fp32.</p>
+<h2 id="ram-budget">RAM budget</h2>
+<p>The hard peak-RSS ceiling set by <code>--ram-budget N</code> (#37). The loader pins as many hot layers as fit under it (after reserving the KV cache and scratch) and streams the rest, guaranteeing <code>resident_bytes() ≤ budget</code>. <code>--ram-budget 0</code> (default) is unlimited streaming. This is SipLLM&#x27;s defining RAM↔speed dial — see <a href="memory-planner.html">memory planner</a>.</p>
+<h2 id="resident-weights">Resident weights</h2>
+<p>The bytes of model weights actually held in RAM at once (distinct from <a href="glossary.html">peak RSS</a>, which also counts KV cache + scratch). Measured <strong>FLAT ~1.5&nbsp;MB</strong> across toy 4/16/32-layer models — proof the streaming thesis holds: resident weights track layer width, not model depth. Real single-layer: 37.6&nbsp;MB (smollm2) / 106.5&nbsp;MB (tinyllama).</p>
+<h2 id="sdot-fast">SDOT / <code>--fast</code></h2>
+<p><code>--fast</code> routes Q8_0 projections through an int8 SDOT (signed dot-product) kernel (<code>matmul_q8_0_i8</code>), ARM-only (<code>__ARM_FEATURE_DOTPROD</code>), quantizing the activation for near-parity Q8 decode. It is <strong>opt-in and an approximation</strong> — the exact fp32-dequant path stays the correctness oracle. Q8_0-only; no AVX2 equivalent.</p>
+<h2 id="streaming">Streaming</h2>
+<p>Loading a transformer block&#x27;s weights from disk, running it, freeing it, and reusing that memory for the next block — so peak weight memory tracks <em>layer</em> size (model width), not <em>model</em> size (depth). The core execution model that lets a model larger than RAM run. See <a href="streaming-loader.html">streaming loader</a>.</p>
+<h2 id="tokenizer-kind">Tokenizer kind</h2>
+<p>Which tokenizer the engine builds from GGUF metadata: <strong>SentencePiece</strong> (Llama) or <strong>byte-level BPE</strong> (GPT-2 / Llama-3). The engine applies <strong>no chat/prompt template</strong> — inference is over raw text (BOS only on a fresh sequence); the Flutter app formats conversations itself. See <a href="tokenizer.html">tokenizer</a>.</p>
+<h2 id="ttft">TTFT</h2>
+<p>Time-to-first-token — wall-clock from generate start to the first emitted token, i.e. the cost of <a href="glossary.html">prefill</a>. Measured smollm2 ~<strong>0.10&nbsp;s</strong> / tinyllama ~<strong>0.68&nbsp;s</strong> (vs llama.cpp 0.003 / 0.021&nbsp;s); SipLLM trades TTFT for footprint in the streaming regime.</p>
+<h2 id="weightsource">WeightSource</h2>
+<p>The interface (<code>include/llm/weight_source.h</code>) the transformer talks to instead of a file: a tensor directory (<code>tensors()</code>, <code>find()</code>), typed metadata (<code>meta_int/meta_float/meta_str</code>), and positional reads (<code>read_raw</code> / <code>read_raw_at</code>). Both the real GGUF parser (<code>GgufFile</code>) and the toy <code>.llmw</code> reader (<code>ModelFile</code>) implement it, so swapping loader or residency strategy touches no line of math.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="competitive-analysis.html"><span>Previous</span>Competitive analysis</a><a class="pn next" href="contributing.html"><span>Next</span>Contributor guide</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#decode">Decode</a></li><li class="toc-h2"><a href="#expansion-factor">Expansion factor</a></li><li class="toc-h2"><a href="#gguf-tensor">GGUF tensor</a></li><li class="toc-h2"><a href="#kv-cache">KV cache</a></li><li class="toc-h2"><a href="#layer-residency">Layer residency</a></li><li class="toc-h2"><a href="#peak-rss">Peak RSS</a></li><li class="toc-h2"><a href="#pinned-layer">Pinned layer</a></li><li class="toc-h2"><a href="#prefetch-hit-miss">Prefetch hit / miss</a></li><li class="toc-h2"><a href="#prefill">Prefill</a></li><li class="toc-h2"><a href="#quant-block">Quant block</a></li><li class="toc-h2"><a href="#ram-budget">RAM budget</a></li><li class="toc-h2"><a href="#resident-weights">Resident weights</a></li><li class="toc-h2"><a href="#sdot-fast">SDOT / --fast</a></li><li class="toc-h2"><a href="#streaming">Streaming</a></li><li class="toc-h2"><a href="#tokenizer-kind">Tokenizer kind</a></li><li class="toc-h2"><a href="#ttft">TTFT</a></li><li class="toc-h2"><a href="#weightsource">WeightSource</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

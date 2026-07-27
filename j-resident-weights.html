@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="j-resident-weights">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flat resident weights · SipLLM docs</title>
+<meta name="description" content="The clearest proof that streaming works is a number that refuses to move. In a resident runtime, weight RAM grows linearly with layer count — twice the layer…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html" class="active" aria-current="page">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Engineering journal <span aria-hidden="true">/</span> Resident weights</div>
+      <h1>Flat resident weights</h1>
+      <p><strong>The clearest proof that streaming works is a number that refuses to move.</strong> In a resident runtime, weight RAM grows linearly with layer count — twice the layers, twice the memory. In SipLLM, resident <em>weight</em> RAM stays essentially <strong>flat</strong> as a model gets deeper, because only one layer&#x27;s weights are ever live and they are held at ~4 bits/weight, not 32. We built two toy models of the same width but 4, 16, and 32 layers deep and measured: resident weights held at ~<strong>1.5&nbsp;MB</strong> across all three.</p>
+<h2 id="the-problem-depth-taxes-memory-in-a-resident-runtime">The problem: depth taxes memory in a resident runtime</h2>
+<p>Load everything resident and each transformer block adds its full weight footprint to RAM for the entire run. A 32-layer model costs 8× the weight RAM of a 4-layer one of the same width, even though the compute only ever touches one block at a time. That linear-in-depth tax is exactly what makes large models un-loadable on small devices.</p>
+<h2 id="the-fix-quantized-residency-fused-per-row-dequant">The fix: quantized residency + fused per-row dequant</h2>
+<p>Two mechanisms from the <a href="j-streaming-layers.html">founding design</a> combine to break the dependence on depth:</p>
+<ol><li><strong>Per-layer residency.</strong> <code>loadLayer(L)</code> makes one block resident; <code>unloadLayer()</code> frees it for reuse (<code>src/loader.cpp</code>). Resident weight RAM is bounded by a single block regardless of how many blocks follow it.</li><li><strong>Weights stay quantized; dequant is fused per-row.</strong> In <code>Residency::Quantized</code> the raw on-disk bytes stay resident and are never bulk-expanded. <code>matmul_quant</code> (<code>src/quant.cpp</code>) dequantizes <em>one output row</em> into a tiny scratch buffer, dots it with the activation, and discards it — so a layer occupies ~4 bits/weight in RAM instead of the 32 it would cost as fp32. <code>Residency::FP32</code> (dequant on load) uses 8× the RAM and survives only as the numeric-equivalence oracle. Norm weights are tiny and always fp32.</li></ol>
+<div class="callout key"><div class="callout-title">Depth is free, width is the cost</div><p>Because residency is per-<em>layer</em> and dequant is per-<em>row</em>, resident weight RAM tracks a single layer&#x27;s <em>width</em>. Adding layers adds run <em>time</em> (more streamed reads) but not resident weight RAM.</p></div>
+<h2 id="measured-the-number-that-doesn-t-move">Measured: the number that doesn&#x27;t move</h2>
+<p>Two toy models, same width, increasing depth — resident weights held flat:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Resident weights</th></tr></thead><tbody><tr><td class="a-left">toy, 4 layers</td><td class="a-right">~1.5 MB</td></tr><tr><td class="a-left">toy, 16 layers</td><td class="a-right">~1.5 MB</td></tr><tr><td class="a-left">toy, 32 layers</td><td class="a-right">~1.5 MB</td></tr></tbody></table></div>
+<p>On real models a single resident layer is <strong>37.6&nbsp;MB</strong> (SmolLM2, 1 layer) and <strong>106.5&nbsp;MB</strong> (TinyLlama, 1 layer) — still one layer&#x27;s width, not the whole model. Contrast the <em>resident</em> extreme, where you deliberately pin hot layers with <code>--ram-budget</code>: pinning dials weight residency up to 143&nbsp;MB (SmolLM2) or 630&nbsp;MB (TinyLlama). That is the whole RAM↔speed range — from one flat layer to a fully pinned model — and it is your choice, not a fixed cost of depth.</p>
+<div class="callout note"><div class="callout-title">Quantization caveats</div><p>The fused per-row path supports F32, F16, BF16, Q4_0/1, Q5_0/1, Q8_0, and the K-quants Q2_K/Q3_K/Q4_K/Q5_K/Q6_K plus IQ4_NL. <strong>Q8_1 and Q8_K are not dequantizable and throw.</strong> Only Q4_K/Q6_K have NEON dequant fast paths; the int8 SDOT <code>--fast</code> kernel is Q8_0-only, ARM-only, and an approximation — the fp32-dequant path remains the correctness oracle. See the <a href="quantization.html">quantization</a> page for the kernel details.</p></div>
+<h2 id="what-it-unlocked">What it unlocked</h2>
+<p>Flat resident weights are why depth stopped mattering: the <a href="j-bigger-than-ram.html">bigger-than-RAM</a> 13&nbsp;B run costs barely more resident weight RAM than the 8&nbsp;B, and a hypothetical 70&nbsp;B of the same width would too. The residency modes and the per-row dequant seam are documented on the <a href="streaming-loader.html">streaming layer loader</a> architecture page; the kernels live in <a href="quantization.html">quantization</a>.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="j-prefetch.html"><span>Previous</span>Predictive prefetch</a><a class="pn next" href="j-q4k.html"><span>Next</span>Q4_K explained</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-problem-depth-taxes-memory-in-a-resident-runtime">The problem: depth taxes memory in a resident runtime</a></li><li class="toc-h2"><a href="#the-fix-quantized-residency-fused-per-row-dequant">The fix: quantized residency + fused per-row dequant</a></li><li class="toc-h2"><a href="#measured-the-number-that-doesn-t-move">Measured: the number that doesn&amp;#x27;t move</a></li><li class="toc-h2"><a href="#what-it-unlocked">What it unlocked</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="kv-cache">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KV cache · SipLLM docs</title>
+<meta name="description" content="Problem → Design → Alternatives → Tradeoffs → Source → Future. Once weights stream one layer at a time (the streaming loader), the KV cache becomes the domin…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html" class="active" aria-current="page">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Architecture <span aria-hidden="true">/</span> KV cache</div>
+      <h1>KV cache</h1>
+      <div class="callout note"><div class="callout-title">Architecture book</div><p><strong>Problem → Design → Alternatives → Tradeoffs → Source → Future.</strong> Once weights stream one layer at a time (the <a href="streaming-loader.html">streaming loader</a>), the KV cache becomes the dominant resident term. Growing it on demand is what keeps a short chat from paying for the full trained context. See also the <a href="transformer.html">transformer forward pass</a> that reads and writes it.</p></div>
+<h2 id="problem">Problem</h2>
+<p>Without a cache, generating token <code>T</code> re-projects and re-attends over all <code>T</code> past positions — O(T²) per step, O(T³) overall. A KV cache stores each position&#x27;s projected K and V once, so a decode step only projects the <em>new</em> token and dots against stored history. But the cache is <strong>activation memory that must survive across every streamed layer and every token</strong>: its footprint is <code>n_layers · ctx · kv_dim · 2 · 4</code> bytes. Committed densely for the full trained context up front, it swamps the streamed weights — on SmolLM2-135M a dense 8k-context fp32 KV was <strong>188.7 MB = 79% of peak RSS</strong>, even for a 16-token chat.</p>
+<h2 id="design">Design</h2>
+<p><code>KVCache</code> (<code>include/llm/kv_cache.h</code>) is a <code>[layer][pos][kv_dim]</code> fp32 store that <strong>grows on demand</strong>. It tracks a live capacity <code>cap_</code> in positions, starts at <code>kInitialCap = 64</code> (or <code>max_ctx</code> if smaller), and doubles it — capped at <code>max_ctx</code> — only as the sequence advances. Doubling makes growth amortized O(1).</p>
+<p>The layout uses <code>cap_</code> as the <strong>per-layer stride</strong>, so growing <code>cap_</code> changes where every layer&#x27;s rows live. <code>grow_to(need)</code> therefore allocates the wider <code>k_</code>/<code>v_</code> buffers and re-lays-out each layer&#x27;s existing rows with <code>memcpy</code> from the old stride to the new:</p>
+<pre><code class="language-text">offset(layer, pos) = ((layer * cap_) + pos) * kv_dim
+
+grow_to(need):                       # need &gt; cap_
+    nc = cap_; while nc &lt; need: nc &lt;&lt;= 1     # double
+    if nc &gt; max_ctx: nc = max_ctx            # hard ceiling (runtime-enforced)
+    alloc nk, nv of n_layers * nc * kv_dim
+    for each layer l:                        # copy old_row = cap_*kv_dim floats
+        memcpy(nk + l*nc*kv_dim, k_ + l*cap_*kv_dim, old_row)
+    swap(k_, nk); swap(v_, nv); cap_ = nc</code></pre>
+<p>Values are copied verbatim, so results are <strong>bitwise-identical</strong> to the old full-preallocation path — a pure RAM win with zero accuracy cost. <code>bytes()</code> reports the true resident footprint, which feeds <code>GenStats.kv_bytes</code>.</p>
+<p>Growth is driven by the accessors, split write vs read:</p>
+<ul><li><strong>Write path</strong> — the non-const <code>k(layer,pos)</code> / <code>v(layer,pos)</code> grow the store (<code>if (pos &gt;= cap_) grow_to(pos+1)</code>) so <code>pos</code> is resident <em>before</em> handing back the pointer. The transformer <code>memcpy</code>s the freshly projected K/V for <code>pos</code> here.</li><li><strong>Read path</strong> — the const overloads never grow: every position an attention loop reads has already been written, hence is within <code>cap_</code>.</li></ul>
+<p><code>set_seq_len(n)</code> also grows ahead if a caller sets the filled length before writing; <code>clear()</code> resets <code>seq_len_</code> to 0 (weights and capacity untouched).</p>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Approach</th><th class="a-left">Resident KV</th><th class="a-left">Why not the default</th></tr></thead><tbody><tr><td class="a-left">Full <code>max_ctx</code> preallocation (original)</td><td class="a-left">∝ trained context</td><td class="a-left">Pays for an 8k window on a 16-token chat; 79% of peak RSS on smollm2.</td></tr><tr><td class="a-left">Grow-on-demand, doubling (<strong>chosen</strong>)</td><td class="a-left">∝ actual sequence</td><td class="a-left">Amortized O(1); bitwise-identical output; footprint tracks use.</td></tr><tr><td class="a-left">Fixed stride + append (no re-layout)</td><td class="a-left">∝ actual sequence</td><td class="a-left">Would need a stride decoupled from <code>cap_</code>; the <code>cap_</code>-as-stride layout is simpler and the memcpy is a one-off per doubling (≤ log₂ ctx times).</td></tr><tr><td class="a-left">Quantized / paged KV</td><td class="a-left">smaller still</td><td class="a-left">Adds accuracy risk and bookkeeping; the dense-fp32-but-small store already collapses the dominant term.</td></tr></tbody></table></div>
+<h2 id="tradeoffs">Tradeoffs</h2>
+<ul><li><strong>Re-layout cost vs steady state.</strong> Each doubling memcpys the whole live cache once. Across a sequence that is ≤ log₂(ctx) copies total — negligible against per-token attention — and decode throughput/TTFT are unchanged (measured identical; only the allocation strategy differs).</li><li><strong>Still fp32, still full history.</strong> This does not shrink the cache below one fp32 K+V per position per layer, and no window is dropped — consistent with the transformer attending the full causal range (no sliding-window attention).</li><li><strong><code>max_ctx</code> is a hard ceiling</strong> the runtime enforces before every <code>forward</code>; <code>grow_to</code> never exceeds it.</li><li><strong><code>embed()</code> clears KV state</strong> — embeddings must use a dedicated runtime, not one mid-conversation.</li></ul>
+<h2 id="kv-grow-on-demand-measured">KV grow-on-demand — measured</h2>
+<p>MacOS M3, warm cache, <code>-n 16</code>, threads=4; peak RSS external via <code>/usr/bin/time -l</code>, matched by the internal counter.</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Peak RSS before</th><th class="a-right">Peak RSS after</th><th class="a-right">KV before</th><th class="a-right">KV after</th></tr></thead><tbody><tr><td class="a-left">SmolLM2-135M</td><td class="a-right">239 MB</td><td class="a-right"><strong>53.5 MB</strong></td><td class="a-right">188.7 MB</td><td class="a-right">2.9 MB</td></tr><tr><td class="a-left">TinyLlama-1.1B Q4_K_M</td><td class="a-right">210.6 MB</td><td class="a-right"><strong>121 MB</strong></td><td class="a-right">92.3 MB</td><td class="a-right">2.9 MB</td></tr></tbody></table></div>
+<p>The KV term collapses from the dominant contributor to a rounding error, and with streamed weights already flat, peak RSS follows it down. Reproduce with <code>/usr/bin/time -l ./build/llm &lt;model&gt; -p Hello -n 16 --greedy --threads 4</code>.</p>
+<h2 id="source-files">Source files</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">File</th><th class="a-left">Role</th></tr></thead><tbody><tr><td class="a-left"><code>include/llm/kv_cache.h</code></td><td class="a-left"><code>KVCache</code>: <code>cap_</code>/<code>seq_len_</code>, <code>k()/v()</code> write-grow + const read, <code>offset</code>, <code>grow_to</code>, <code>bytes</code></td></tr><tr><td class="a-left"><code>src/transformer.cpp</code></td><td class="a-left">writes K/V at <code>pos</code> (<code>kv_-&gt;k/v(layer,pos)</code>), reads history in the GQA loop, calls <code>set_seq_len</code></td></tr><tr><td class="a-left"><code>docs/kv-cache.md</code></td><td class="a-left">the module note and measured before/after</td></tr></tbody></table></div>
+<h2 id="future-work">Future work</h2>
+<ul><li><strong>Quantized or paged KV</strong> for very long contexts, if the dense-fp32 store ever becomes the ceiling again.</li><li><strong>Windowed eviction</strong> to pair with real sliding-window attention once the <a href="transformer.html">transformer</a> models it.</li><li><strong>Sequence reuse across turns</strong> so a growing chat need not re-<code>clear()</code> when the runtime can prove the prefix is unchanged.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="transformer.html"><span>Previous</span>Transformer</a><a class="pn next" href="quantization.html"><span>Next</span>Quantization</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#problem">Problem</a></li><li class="toc-h2"><a href="#design">Design</a></li><li class="toc-h2"><a href="#alternatives-considered">Alternatives considered</a></li><li class="toc-h2"><a href="#tradeoffs">Tradeoffs</a></li><li class="toc-h2"><a href="#kv-grow-on-demand-measured">KV grow-on-demand — measured</a></li><li class="toc-h2"><a href="#source-files">Source files</a></li><li class="toc-h2"><a href="#future-work">Future work</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

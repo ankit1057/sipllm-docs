@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="why-not-mmap">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why not just mmap? · SipLLM docs</title>
+<meta name="description" content="What mmap actually buys you Be fair: mmap is a genuinely good technique, and SipLLM ships it as a first-class backend (--mmap). Its win is OS page-cache buff…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html" class="active" aria-current="page">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Product <span aria-hidden="true">/</span> Why not mmap everything?</div>
+      <h1>Why not just mmap?</h1>
+      <div class="hero"><p class="lead"><strong>Because <code>mmap</code> has no hard ceiling.</strong> It maps the file into the address space and lets the OS decide residency — and the OS can fault the whole model in. SipLLM offers <code>mmap</code> as one backend, but pairs it with an <em>explicit budget contract</em> so peak RSS never exceeds a byte ceiling you set.</p></div>
+<h2 id="what-mmap-actually-buys-you">What mmap actually buys you</h2>
+<p>Be fair: <code>mmap</code> is a genuinely good technique, and SipLLM ships it as a first-class backend (<code>--mmap</code>). Its win is <strong>OS page-cache buffering</strong> — mapped pages are shared with the page cache, so re-reading weights that are still cached is cheap, and cold pages fault in on demand instead of being read up front. For a model that fits comfortably in RAM, letting the kernel manage residency is simple and fast.</p>
+<div class="callout note"><div class="callout-title">mmap in SipLLM is not zero-copy</div><p>In the loader, <code>read_raw_at</code> <strong>memcpys</strong> from mapped pages into a resident buffer — it does not hand the transformer a pointer into the mapping. The benefit is page-cache buffering, not zero-copy. <code>FileBacking::prefetch()</code> (an <code>fadvise</code>/<code>madvise</code> readahead hook) exists but is currently unused.</p></div>
+<h2 id="the-problem-residency-is-the-os-s-decision-not-yours">The problem: residency is the OS&#x27;s decision, not yours</h2>
+<p><code>mmap</code> gives you <code>∝ working set, uncontrolled</code>. There is no mechanism to say <em>&quot;never exceed 300 MB.&quot;</em> If the access pattern touches every page — which a full forward pass over every layer does, every token — the kernel is free to keep all of them resident. Under memory pressure it evicts by its own policy, not yours. That is fine on a workstation; on a phone it means the model can fault fully in, blow the memory budget, and get the process OOM-killed.</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Approach</th><th class="a-left">Peak RSS</th><th class="a-left">Hard ceiling?</th></tr></thead><tbody><tr><td class="a-left">Load everything resident</td><td class="a-left">∝ model size</td><td class="a-left">no — cannot run a model larger than RAM at all</td></tr><tr><td class="a-left"><code>mmap</code> the whole file</td><td class="a-left">∝ working set, uncontrolled</td><td class="a-left"><strong>no</strong> — the OS decides residency and can fault the whole model in</td></tr><tr><td class="a-left">SipLLM streaming + <code>--ram-budget</code></td><td class="a-left">≤ your budget</td><td class="a-left"><strong>yes</strong> — the loader enforces it per layer</td></tr></tbody></table></div>
+<h2 id="the-seam-mmap-as-a-backend-not-the-strategy">The seam: mmap as a backend, not the strategy</h2>
+<p>SipLLM separates <strong>how bytes arrive</strong> from <strong>how much stays resident</strong>. Both live behind the <code>WeightSource</code> seam, so the transformer math is identical either way:</p>
+<div class="card-grid"><div class="card"><h3>Backend (how bytes arrive)</h3><p>Synchronous <code>pread</code>, an async double-buffered <a href="prefetch.html">prefetch</a> ring, or <code>mmap</code> — switchable per run, all producing bit-identical logits. See <a href="streaming-loader.html">the loader</a>.</p></div><div class="card"><h3>Budget contract (how much stays resident)</h3><p>The <a href="memory-planner.html">memory planner</a> (<code>src/mem_plan.cpp</code>) reserves the KV cache and a scratch allowance, derives a weight ceiling from <code>--ram-budget</code>, and the loader pins <code>[0, n_pinned)</code> and streams the rest — with a per-layer guard that keeps <code>resident_bytes() ≤ budget</code>.</p></div></div>
+<p>This is the capability no page-cache trick gives you: <strong>bounded RSS under a hard ceiling</strong>, on a smooth RAM↔speed continuum, with output bit-for-bit invariant to the budget (<code>tests/test_ram_budget.cpp</code>).</p>
+<div class="callout key"><div class="callout-title">The distinction</div><p><code>mmap</code> optimizes <em>throughput on a model that fits</em>. SipLLM&#x27;s budget contract guarantees <em>a ceiling on a model that may not fit</em>. You can even combine them — use the <code>mmap</code> backend for its page-cache win while the budget planner enforces the hard bound.</p></div>
+<h2 id="when-to-reach-for-which">When to reach for which</h2>
+<ul><li><strong>Model fits in RAM, want simplicity/speed</strong> → plain <code>mmap</code> (or a mature resident runtime) is great.</li><li><strong>Model must not exceed a fixed memory budget</strong>, or is <strong>larger than RAM</strong> → SipLLM streaming with <code>--ram-budget</code>. See <a href="why-streaming.html">Why streaming?</a> and the <a href="benchmarks.html">benchmarks</a>.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="why-streaming.html"><span>Previous</span>Why streaming?</a><a class="pn next" href="why-another-runtime.html"><span>Next</span>Why another runtime?</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#what-mmap-actually-buys-you">What mmap actually buys you</a></li><li class="toc-h2"><a href="#the-problem-residency-is-the-os-s-decision-not-yours">The problem: residency is the OS&amp;#x27;s decision, not yours</a></li><li class="toc-h2"><a href="#the-seam-mmap-as-a-backend-not-the-strategy">The seam: mmap as a backend, not the strategy</a></li><li class="toc-h2"><a href="#when-to-reach-for-which">When to reach for which</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

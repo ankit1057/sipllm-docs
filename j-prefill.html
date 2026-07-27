@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="j-prefill">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Single-pass prefill · SipLLM docs</title>
+<meta name="description" content="Streaming weights turned a free operation into a catastrophically expensive one — and we almost didn&amp;#x27;t notice. Prefill runs the prompt through the model…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html" class="active" aria-current="page">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Engineering journal <span aria-hidden="true">/</span> Prefill optimization</div>
+      <h1>Single-pass prefill</h1>
+      <p><strong>Streaming weights turned a free operation into a catastrophically expensive one — and we almost didn&#x27;t notice.</strong> Prefill runs the prompt through the model to build the KV cache and produce the first token&#x27;s logits. In a resident-weight runtime it is a single batched pass, essentially free. But SipLLM streams weights layer-by-layer, and the naive prefill — one <code>forward()</code> per prompt token — streams the <em>entire model once per prompt token</em>. A P-token prompt reads the whole model from storage P times before the first token appears.</p>
+<h2 id="the-problem-the-warm-cache-hid-a-disaster">The problem: the warm cache hid a disaster</h2>
+<p>On a warm dev box the OS page cache absorbs the re-reads, so the bug was invisible: TTFT looked fine and nobody streamed the weights <em>from disk</em> twice. But the target is a cold-cache phone with slow storage, or a model larger than RAM where every re-stream is genuine I/O. There, a 122-token prompt meant reading the model 122 times before decode even began — the streaming design&#x27;s one pathological case.</p>
+<h2 id="the-fix-batch-over-positions-stream-each-layer-once">The fix: batch over positions, stream each layer once</h2>
+<p><code>Transformer::prefill(tokens, n, start_pos)</code> (<code>src/transformer.cpp</code>) inverts the loop nesting. Instead of <em>for each token, stream every layer</em>, it does <em>for each layer, stream once, then sweep every prompt position through it</em>:</p>
+<pre><code class="language-text">for layer L in 0 .. n_layers-1:
+    loadLayer(L)                 -&gt; stream block L ONCE
+    for i in 0 .. n-1:           -&gt; sweep all n prompt positions through it
+        block(L, pos = start_pos + i)
+    unloadLayer()
+final RMSNorm + project_output   -&gt; logits (last position only, feeds the sampler)</code></pre>
+<p>Causality is preserved for free: position <code>i</code> is processed after every earlier position, so the K/V history it attends over (<code>kv_[layer][0..i]</code>) is already written. Each per-position computation is identical to the old per-token path, so <strong>output is bit-identical</strong>; only the last position&#x27;s logits feed the sampler, exactly as before. Peak RSS is unchanged — the only addition is a small <code>n × dim</code> residual scratch; the weights are still 1–2 resident blocks. <code>Runtime::generate</code> now calls <code>prefill(...)</code> once instead of looping <code>forward()</code>.</p>
+<h2 id="measured-the-prefill-table">Measured: the prefill table</h2>
+<p>M3, warm cache, 4 threads. &quot;Streamed&quot; is total bytes read from the weight source during prefill:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Workload</th><th class="a-left">Metric</th><th class="a-right">Before</th><th class="a-right">After</th></tr></thead><tbody><tr><td class="a-left">smollm2, 122-tok prompt</td><td class="a-left">streamed</td><td class="a-right">14,456 MB</td><td class="a-right">790 MB (18.3×)</td></tr><tr><td class="a-left">smollm2, 122-tok prompt</td><td class="a-left">TTFT</td><td class="a-right">3.44 s</td><td class="a-right">1.96 s</td></tr><tr><td class="a-left">tinyllama, 50-tok prompt</td><td class="a-left">streamed</td><td class="a-right">31,128 MB</td><td class="a-right">2,882 MB (10.8×)</td></tr></tbody></table></div>
+<p>The streamed-bytes reduction — 18.3× and 10.8× — is the fundamental win. The wall-time TTFT gain (3.44&nbsp;s → 1.96&nbsp;s) is modest on a warm-cache SSD and grows with how I/O-bound the target is; on a cold-cache phone the byte reduction <em>is</em> the latency.</p>
+<div class="callout measured"><div class="callout-title">Provably the same generation</div><p>The output is byte-identical to the per-token path — verified by diff and by <code>tests/test_prefill.cpp</code>, which asserts identical logits, identical KV cache, and identical sampled token. This was a pure I/O optimization with zero accuracy cost.</p></div>
+<h2 id="what-it-unlocked">What it unlocked</h2>
+<p>Prefill stopped being the streaming model&#x27;s Achilles&#x27; heel: TTFT now scales with prompt length once, not P times, which is what makes long prompts viable on the target hardware. It pairs with <a href="kv-cache.html">grow-on-demand KV</a> so activation memory stays bounded too. The batched-prefill path is part of the <a href="runtime.html">runtime</a> and <a href="transformer.html">transformer</a> architecture pages.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="j-lm-head.html"><span>Previous</span>Streaming the LM head</a><a class="pn next" href="j-prefetch.html"><span>Next</span>Predictive prefetch</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-problem-the-warm-cache-hid-a-disaster">The problem: the warm cache hid a disaster</a></li><li class="toc-h2"><a href="#the-fix-batch-over-positions-stream-each-layer-once">The fix: batch over positions, stream each layer once</a></li><li class="toc-h2"><a href="#measured-the-prefill-table">Measured: the prefill table</a></li><li class="toc-h2"><a href="#what-it-unlocked">What it unlocked</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

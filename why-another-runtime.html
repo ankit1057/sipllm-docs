@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="why-another-runtime">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why another runtime? · SipLLM docs</title>
+<meta name="description" content="The gap in the landscape llama.cpp, vLLM, TensorRT-LLM, MLX, MLC, and ExecuTorch are excellent — and they share one assumption: the model&amp;#x27;s weights are …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html" class="active" aria-current="page">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Product <span aria-hidden="true">/</span> Why another runtime?</div>
+      <h1>Why another runtime?</h1>
+      <div class="hero"><p class="lead"><strong>Because every mature runtime requires the model to fit in RAM or VRAM.</strong> SipLLM's differentiator is one capability none of them offers: <em>bounded RSS under a hard ceiling for a model that does not fit</em>. It is not trying to beat llama.cpp at resident inference — it explores a different execution model.</p></div>
+<h2 id="the-gap-in-the-landscape">The gap in the landscape</h2>
+<p>llama.cpp, vLLM, TensorRT-LLM, MLX, MLC, and ExecuTorch are excellent — and they share one assumption: the model&#x27;s weights are resident (in RAM or VRAM) for the duration. That assumption is invisible until you hit an edge device with lots of storage but little RAM and almost no usable VRAM. There, the model simply does not fit, and no amount of kernel tuning helps.</p>
+<div class="callout key"><div class="callout-title">The one differentiator</div><p>SipLLM holds peak memory to a <strong>bounded, configurable ceiling</strong> while running models <strong>significantly larger than available RAM</strong>. <code>--ram-budget</code> turns <em>bounded-RSS XOR speed</em> into a tunable continuum — llama.cpp&#x27;s <code>mmap</code> has <a href="why-not-mmap.html">no hard ceiling</a>; vLLM/TRT-LLM/MLX/MLC/ExecuTorch require the model to fit in RAM/VRAM.</p></div>
+<p>For the full feature-by-feature breakdown, see <a href="competitive-analysis.html">Competitive analysis</a>.</p>
+<h2 id="positioning-honestly">Positioning, honestly</h2>
+<div class="card-grid"><div class="card"><h3>vs llama.cpp</h3><p>The closest peer and SipLLM's measurement baseline. Where the model fits, llama.cpp is faster. SipLLM's advantage is footprint: <strong>2.1× less RAM at ~88% of its decode</strong> (TinyLlama Q8, resident), or <strong>13× less RAM</strong> streaming — and it runs models llama.cpp cannot fit at all.</p></div><div class="card"><h3>vs vLLM / TensorRT-LLM</h3><p>Server-class, GPU-first, throughput-optimized runtimes. They assume datacenter memory and hardware. SipLLM targets the opposite end — a single edge device, CPU, no dependencies.</p></div><div class="card"><h3>vs MLX / MLC</h3><p>On-device runtimes, but the weights are resident. SipLLM's streaming loader is orthogonal: it makes the resident set a <em>layer</em>, not the model.</p></div><div class="card"><h3>vs ExecuTorch</h3><p>Mobile-focused export/runtime, still fit-in-memory. SipLLM adds the missing axis — a hard RAM ceiling with graceful degradation to pure streaming below it.</p></div></div>
+<h2 id="the-proof">The proof</h2>
+<p>Bounded-memory execution is measured, not claimed — on a 16&nbsp;GB Mac with ~3&nbsp;GB free, where loading these resident is impossible:</p>
+<div class="stat-grid"><div class="stat"><div class="stat-value">317 MB</div><div class="stat-label">Llama-2-13B peak RSS</div><div class="stat-sub">7.87 GB Q4 &rarr; 25&times; smaller</div></div><div class="stat"><div class="stat-value">204 MB</div><div class="stat-label">Llama-3.1-8B peak RSS</div><div class="stat-sub">4.92 GB Q4 &rarr; 24&times; smaller</div></div><div class="stat"><div class="stat-value">2.1&times;</div><div class="stat-label">less RAM than llama.cpp</div><div class="stat-sub">at ~88% of its decode (TinyLlama Q8, resident)</div></div></div>
+<p>And it is a real engine, not a demo: unmodified GGUF v2/v3 from Hugging Face, nine architectures (Llama, Mistral, Qwen2/2.5, Gemma&nbsp;2, Gemma&nbsp;3 text, Phi-3, Phi-2, GPT-2, Mixtral/MoE), numerically validated against llama.cpp layer-by-layer, with zero runtime dependencies. See <a href="benchmarks.html">Benchmarks</a>.</p>
+<h2 id="where-sipllm-is-the-wrong-choice">Where SipLLM is the wrong choice</h2>
+<p>Honesty is the point. Reach for another runtime when:</p>
+<ul><li><strong>The model fits comfortably in RAM/VRAM and you want maximum throughput.</strong> A resident runtime wins — SipLLM&#x27;s streaming machinery is overhead you do not need.</li><li><strong>You need working GPU acceleration today.</strong> SipLLM&#x27;s Vulkan path is &lt;span class=&quot;badge exp&quot;&gt;experimental&lt;/span&gt; (detection-only; <code>vulkan_matmul</code> falls back to CPU). It is CPU-first by design.</li><li><strong>You need server-scale batched throughput.</strong> That is vLLM/TRT-LLM territory.</li></ul>
+<p>SipLLM earns its existence in exactly one regime: <strong>the model is bigger than the memory you have, and you still need a hard ceiling.</strong> See <a href="why-streaming.html">Why streaming?</a> and the <a href="vision.html">vision</a> for where that leads.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="why-not-mmap.html"><span>Previous</span>Why not mmap everything?</a><a class="pn next" href="vision.html"><span>Next</span>Vision</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-gap-in-the-landscape">The gap in the landscape</a></li><li class="toc-h2"><a href="#positioning-honestly">Positioning, honestly</a></li><li class="toc-h2"><a href="#the-proof">The proof</a></li><li class="toc-h2"><a href="#where-sipllm-is-the-wrong-choice">Where SipLLM is the wrong choice</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

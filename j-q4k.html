@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="j-q4k">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q4_K explained · SipLLM docs</title>
+<meta name="description" content="**Q4_K is how a 4-bit GGUF actually stores its weights: 256 numbers squeezed into a 144-byte block — roughly 4.5 bits per weight — with two levels of scaling…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html" class="active" aria-current="page">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Engineering journal <span aria-hidden="true">/</span> Q4_K explained</div>
+      <h1>Q4_K explained</h1>
+      <p>**Q4_K is how a 4-bit GGUF actually stores its weights: 256 numbers squeezed into a 144-byte block — roughly 4.5 bits per weight — with two levels of scaling so the quantization error stays tiny. SipLLM has to decode that block <em>byte-for-byte identically to ggml</em>, because the whole point of the runtime is to consume unmodified <code>Q4_K_M</code> files pulled straight from Hugging Face. This is the walkthrough of <code>dequant_q4_K</code> in <code>src/quant.cpp</code>: what the 144 bytes mean, how <code>get_scale_min_k4</code> unpacks the packed 6-bit scales, and why we keep two implementations of the same formula.**</p>
+<h2 id="the-problem-consume-ggml-s-format-exactly">The problem: consume ggml&#x27;s format exactly</h2>
+<p>A <code>Q4_K_M</code> checkpoint is a mix of <code>Q4_K</code> and <code>Q6_K</code> tensors. If SipLLM&#x27;s dequantizer disagrees with <code>ggml-quants.c</code> by even one ULP in the wrong place, the logits drift and the model stops matching llama.cpp. So <code>src/quant.cpp</code> does not invent a layout — every block formula mirrors ggml, and <code>QK_K = 256</code> is the K-quant block size. The job is decode, not design: read the on-disk bytes, reproduce the exact fp32 values ggml would.</p>
+<h2 id="anatomy-of-a-144-byte-block">Anatomy of a 144-byte block</h2>
+<p>A <code>Q4_K</code> block holds <code>QK_K = 256</code> weights in exactly 144 bytes. From <code>dequant_q4_K</code>, the pointers are <code>scales = p + 4</code>, <code>q = p + 16</code>, and <code>p += 144</code> per block:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Offset</th><th class="a-right">Bytes</th><th class="a-left">Field</th><th class="a-left">Meaning</th></tr></thead><tbody><tr><td class="a-left">0</td><td class="a-right">2</td><td class="a-left"><code>d</code> (fp16)</td><td class="a-left">super-block scale</td></tr><tr><td class="a-left">2</td><td class="a-right">2</td><td class="a-left"><code>dmin</code> (fp16)</td><td class="a-left">super-block minimum</td></tr><tr><td class="a-left">4</td><td class="a-right">12</td><td class="a-left">packed scales/mins</td><td class="a-left">eight 6-bit scales + eight 6-bit mins</td></tr><tr><td class="a-left">16</td><td class="a-right">128</td><td class="a-left"><code>q</code></td><td class="a-left">256 × 4-bit quants (two nibbles per byte)</td></tr><tr><td class="a-left"></td><td class="a-right"><strong>144</strong></td><td class="a-left"></td><td class="a-left"><strong>256 weights ≈ 4.5 bits each</strong></td></tr></tbody></table></div>
+<p>The 256 weights are split into <strong>eight 32-element sub-blocks</strong>. Each sub-block gets its own 6-bit scale and 6-bit min, and <em>those</em> are themselves scaled by the two fp16 super-block values <code>d</code> and <code>dmin</code>. Two tiers of scaling — a coarse fp16 pair for the whole block, a fine 6-bit pair per sub-block — is what buys Q4_K its accuracy at 4 bits.</p>
+<h2 id="unpacking-the-scales-get-scale-min-k4">Unpacking the scales: <code>get_scale_min_k4</code></h2>
+<p>The eight 6-bit scales and eight 6-bit mins do not fit cleanly in bytes — 16 × 6 bits = 96 bits = 12 bytes, but with the low four and high four sub-blocks packed differently. <code>get_scale_min_k4(j, q, d, m)</code> (shared with <code>Q5_K</code>) is the bit-surgery that recovers sub-block <code>j</code>&#x27;s scale <code>d</code> and min <code>m</code>:</p>
+<pre><code class="language-text">if j &lt; 4:
+    d = q[j]     &amp; 63            // low 6 bits
+    m = q[j + 4] &amp; 63
+else:                            // j in 4..7, high bits stashed in the first 8 bytes
+    d = (q[j + 4] &amp; 0xF) | ((q[j - 4] &gt;&gt; 6) &lt;&lt; 4)
+    m = (q[j + 4] &gt;&gt;  4) | ((q[j - 0] &gt;&gt; 6) &lt;&lt; 4)</code></pre>
+<p>The first four sub-blocks store their 6-bit scale/min directly in the low six bits of bytes <code>0..3</code> (scales) and <code>4..7</code> (mins). The upper four sub-blocks reuse the <em>top two bits</em> of those same bytes as the high nibble, with the low nibble living in bytes <code>8..11</code>. It looks arbitrary; it is exactly ggml&#x27;s packing, which is the only thing that matters.</p>
+<h2 id="the-dequant-formula">The dequant formula</h2>
+<p>The main loop walks the 256 weights in strides of 64 (two 32-element sub-blocks per pass), pulling a fresh pair of scale/min pairs each time:</p>
+<pre><code class="language-text">for j in 0, 64, 128, 192:                 // is steps 0,2,4,6
+    get_scale_min_k4(is + 0) -&gt; sc, m ;  d1 = d*sc ;  m1 = dmin*m
+    get_scale_min_k4(is + 1) -&gt; sc, m ;  d2 = d*sc ;  m2 = dmin*m
+    for l in 0..31:  y[l]      = d1 * (q[l] &amp; 0xF) - m1     // low nibbles
+    for l in 0..31:  y[l + 32] = d2 * (q[l] &gt;&gt; 4)  - m2     // high nibbles
+    q += 32 ; is += 2</code></pre>
+<p>So the fully-expanded value of a weight is <code>d * sub_scale * quant - dmin * sub_min</code>. The low nibble of each <code>q</code> byte feeds one sub-block (<code>d1</code>, <code>m1</code>); the high nibble feeds the next (<code>d2</code>, <code>m2</code>). Note the sign: it is a <code>- m</code> (a subtracted minimum), not the <code>+ m</code> of the legacy affine <code>Q4_1</code> a few functions up — another detail that must match ggml or the numbers walk off.</p>
+<h2 id="two-implementations-one-answer">Two implementations, one answer</h2>
+<p><code>dequant_q4_K</code> is written twice. Under <code>LLM_HAVE_NEON</code> the inner loop is hand-vectorized: <code>q</code> bytes are loaded 16 at a time, low/high nibbles masked and shifted apart, widened <code>u8 → u16 → u32 → f32</code>, and the affine <code>d1*x - m1</code> is a single fused multiply-add — <code>vfmaq_n_f32(nm1, x, d1)</code> computes <code>(-m1) + x*d1</code>. The <code>#else</code> branch is the plain scalar loop shown above.</p>
+<div class="callout key"><div class="callout-title">The scalar path is the oracle</div><p><code>Q4_K</code> and <code>Q6_K</code> are the only K-quants with a NEON fast path, and the int8 <code>--fast</code> SDOT kernel is <strong>Q8_0-only</strong> and ARM-only — it does not touch K-quants yet. The scalar fp32-dequant path is deliberately kept as the numeric oracle: every backend, on every architecture, must reproduce it. That is what lets the golden test assert the NEON output is correct rather than merely fast.</p></div>
+<h2 id="where-it-sits-in-the-engine">Where it sits in the engine</h2>
+<p><code>dequant_q4_K</code> is one arm of the <code>dequantize_row</code> dispatch, which also serves <code>matmul_quant</code> — the per-row <em>dequantize-then-dot</em> that keeps a whole layer at ~4 bits in RAM instead of expanding it to fp32. That fused path is what makes <a href="streaming-loader.html">streaming a Q4_K_M model</a> memory-bounded. The correctness of this exact decode is measured against llama.cpp:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Format</th><th class="a-right">worst layer max\</th><th class="a-right">Δ\</th><th class="a-right"></th><th class="a-center">final logit max\</th><th class="a-center">Δ\</th><th class="a-center"></th><th>final cosine</th><th>top-10</th><th>argmax</th><th>result</th></tr></thead><tbody><tr><td class="a-left">Q4_K_M</td><td class="a-right">3.88e-01</td><td class="a-right">4.35e-01</td><td class="a-right">0.999823</td><td class="a-center">10/10</td><td class="a-center">✓</td><td class="a-center">PASS</td></tr></tbody></table></div>
+<p>Same prompt, same argmax, cosine <code>0.999823</code> against llama.cpp on TinyLlama-1.1B. The next win is extending the int-dot <code>--fast</code> kernel to K-quants so 4-bit decode reaches Q8-class speed — today <code>Q4_K</code> decode still runs through this fp32 path. For the format&#x27;s place among all the quantizations SipLLM handles, see the <a href="quantization.html">Quantization</a> chapter; for the measured accuracy of every format, see <a href="benchmarks.html">Benchmarks</a>.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="j-resident-weights.html"><span>Previous</span>Resident weights</a><a class="pn next" href="j-gguf.html"><span>Next</span>GGUF internals</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-problem-consume-ggml-s-format-exactly">The problem: consume ggml&amp;#x27;s format exactly</a></li><li class="toc-h2"><a href="#anatomy-of-a-144-byte-block">Anatomy of a 144-byte block</a></li><li class="toc-h2"><a href="#unpacking-the-scales-get-scale-min-k4">Unpacking the scales: get_scale_min_k4</a></li><li class="toc-h2"><a href="#the-dequant-formula">The dequant formula</a></li><li class="toc-h2"><a href="#two-implementations-one-answer">Two implementations, one answer</a></li><li class="toc-h2"><a href="#where-it-sits-in-the-engine">Where it sits in the engine</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

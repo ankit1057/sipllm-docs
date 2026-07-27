@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="j-gguf">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GGUF internals · SipLLM docs</title>
+<meta name="description" content="GGUF is the container llama.cpp popularized: a flat, self-describing file with a header, a key-value metadata table, a tensor directory, and one big aligned …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html" class="active" aria-current="page">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Engineering journal <span aria-hidden="true">/</span> GGUF internals</div>
+      <h1>GGUF internals</h1>
+      <p><strong>GGUF is the container llama.cpp popularized: a flat, self-describing file with a header, a key-value metadata table, a tensor directory, and one big aligned blob of tensor bytes. SipLLM parses only the first three — magic, metadata, and directory — then leaves the blob on disk and streams each tensor by positional <code>pread</code> when a layer needs it. This is the tour of <code>src/gguf.cpp</code> and <code>include/llm/gguf.h</code>: the byte layout, how the metadata KV and tensor directory are decoded, the 32-byte alignment rule, and why parsing never loads the file whole.</strong></p>
+<h2 id="the-byte-layout">The byte layout</h2>
+<p>Everything is little-endian, and the header is fixed:</p>
+<pre><code class="language-text">magic     &quot;GGUF&quot;  = 0x46554747   (u32)
+version                          (u32, must be 2 or 3)
+tensor_count                     (u64)
+metadata_kv_count                (u64)
+metadata_kv_count × { gguf_string key ; u32 value_type ; value }
+tensor_count      × { gguf_string name ; u32 n_dims ; u64 dims[] ; u32 type ; u64 offset }
+padding to general.alignment (default 32)
+tensor data blob   — each tensor at data_start + its relative offset</code></pre>
+<p>A <code>gguf_string</code> is a <code>u64</code> length followed by that many raw bytes. <code>GgufFile</code>&#x27;s constructor checks the magic against <code>kGGUFMagic = 0x46554747</code> and rejects any version that is not 2 or 3 — those are the only two on-disk revisions the parser guarantees.</p>
+<h2 id="reading-the-header-without-reading-the-file">Reading the header without reading the file</h2>
+<p>GGUF headers are parsed strictly front-to-back, and a real model&#x27;s tokenizer arrays can hold tens of thousands of strings. Doing that with millions of tiny <code>pread</code>s would be miserable, and slurping the whole file would defeat the entire streaming premise. So <code>gguf.cpp</code> uses a <code>BufReader</code>: a <strong>1 MB refilling window</strong> over the <code>FileBacking</code>. It hands out <code>pod&lt;T&gt;()</code> and <code>gstr()</code> reads from the buffer, refilling by <code>pread_exact</code> only when the cursor hits the end. The header parse touches at most a handful of megabytes regardless of model size.</p>
+<h2 id="metadata-scalar-and-array-kv">Metadata: scalar and array KV</h2>
+<p>Each metadata entry is a key string, a <code>u32</code> type code (<code>GgufType</code>), and a value. <code>read_value</code> decodes it into a tagged <code>MetaValue</code>:</p>
+<ul><li><strong>Scalars</strong> — <code>UINT8..INT64</code>, <code>BOOL</code>, <code>FLOAT32/64</code> collapse to <code>MetaValue::Kind::Int</code> or <code>Float</code>; <code>STRING</code> to <code>Str</code>.</li><li><strong>Arrays</strong> (<code>GgufType::ARRAY</code>) carry an element type and a <code>u64</code> count, then collapse to the matching typed vector — <code>ia</code> (ints), <code>fa</code> (floats), or <code>sa</code> (strings). Nested arrays are rejected.</li></ul>
+<p>That is how every hyperparameter and the entire tokenizer vocabulary arrive: <code>n_layers</code>, RoPE base, the vocab and merges arrays, and the architecture string are all just typed KV entries the <a href="tokenizer.html">tokenizer</a> and runtime read back with <code>meta_int</code> / <code>meta_float</code> / <code>meta_str</code>. One special key, <code>general.alignment</code>, is pulled out early because it changes where the data blob starts.</p>
+<h2 id="the-tensor-directory">The tensor directory</h2>
+<p>For each tensor the directory records a name, a dimension count, the dims, a <code>u32</code> dtype code, and a <code>u64</code> offset <em>relative to the data section</em>. Two subtleties in the loop:</p>
+<ul><li><strong>Dims are stored fastest-first</strong> (<code>ne[0]</code> is the inner/input dim). SipLLM reverses them — <code>ti.shape.assign(dims.rbegin(), dims.rend())</code> — so <code>shape[0]</code> is the outer/output dim, matching the engine&#x27;s row-major <code>[n_out, n_in]</code> convention.</li><li><strong>The dtype code is stored verbatim.</strong> <code>DType</code>&#x27;s numeric values deliberately mirror ggml&#x27;s <code>enum ggml_type</code>, so the parser casts the on-disk <code>u32</code> straight into <code>DType</code> and the quant dispatcher switches on the same enum. <code>nbytes</code> is then computed from the type&#x27;s block geometry via <code>type_nbytes</code> — never assumed.</li></ul>
+<h2 id="alignment-and-the-data-region">Alignment and the data region</h2>
+<p>The data blob does not start right after the directory; it starts at the next <code>general.alignment</code> boundary (default <strong>32</strong>):</p>
+<pre><code class="language-text">data_offset_ = round_up(r.tell(), alignment_)
+for each tensor:  t.offset += data_offset_        // relative -&gt; absolute
+                  check t.offset + t.nbytes &lt;= file size</code></pre>
+<p>Every tensor offset is rebased from data-section-relative to an absolute file offset, and each is bounds-checked against the file size so a truncated or malformed file fails loudly at parse time rather than mid-inference.</p>
+<h2 id="streaming-a-tensor-positional-pread">Streaming a tensor: positional <code>pread</code></h2>
+<p>After the constructor returns, <code>GgufFile</code> holds only the directory and metadata — <strong>not one byte of weight data</strong>. When a layer needs a weight, the loader calls <code>read_raw</code> / <code>read_raw_at</code>:</p>
+<pre><code class="language-text">read_raw_at(offset, dst, n):
+    if mmap base present:  memcpy(dst, base + offset, n)   // OS page cache buffers
+    else:                  file_-&gt;pread_exact(offset, dst, n)</code></pre>
+<p>It is a positional read — thread-safe, targeted at one tensor&#x27;s byte range, and it never materializes the whole file. Both <code>GgufFile</code> and the toy <code>.llmw</code> <code>ModelFile</code> implement the same <a href="gguf-parser.html"><code>WeightSource</code></a> seam (directory + typed metadata + positional reads), which is why the transformer never learns whether its weights came from a real GGUF or a test fixture.</p>
+<div class="callout note"><div class="callout-title">mmap is not zero-copy here</div><p>Even with the <code>mmap</code> backend, <code>read_raw_at</code> <code>memcpy</code>s from mapped pages into a resident buffer — the win is OS page-cache buffering, not a zero-copy view. The <code>pread</code> path is the default.</p></div>
+<p>That directory-plus-positional-reads design is the foundation of the whole runtime: parse the map once, then <a href="streaming-loader.html">stream layers</a> off disk one block at a time. For the full parser reference see the <a href="gguf-parser.html">GGUF parser</a> chapter; for how the decoded vocabulary becomes a working tokenizer, see <a href="tokenizer.html">Tokenizer</a>.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="j-q4k.html"><span>Previous</span>Q4_K explained</a><a class="pn next" href="j-peak-rss.html"><span>Next</span>Why peak RSS matters</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-byte-layout">The byte layout</a></li><li class="toc-h2"><a href="#reading-the-header-without-reading-the-file">Reading the header without reading the file</a></li><li class="toc-h2"><a href="#metadata-scalar-and-array-kv">Metadata: scalar and array KV</a></li><li class="toc-h2"><a href="#the-tensor-directory">The tensor directory</a></li><li class="toc-h2"><a href="#alignment-and-the-data-region">Alignment and the data region</a></li><li class="toc-h2"><a href="#streaming-a-tensor-positional-pread">Streaming a tensor: positional pread</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

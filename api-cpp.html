@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="api-cpp">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C++ engine reference · SipLLM docs</title>
+<meta name="description" content="The engine lives under include/llm/ in namespace llm and is standard C++17 with no runtime dependencies (pthreads only). This page reproduces the key public …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html" class="active" aria-current="page">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">API reference <span aria-hidden="true">/</span> C++ engine</div>
+      <h1>C++ engine reference</h1>
+      <p>The engine lives under <code>include/llm/</code> in <code>namespace llm</code> and is standard C++17 with no runtime dependencies (pthreads only). This page reproduces the key public surface verbatim, grouped by header. The math flows top-down: <code>Runtime</code> owns a <code>WeightSource</code> &rarr; <code>LayerLoader</code> &rarr; <code>KVCache</code> &rarr; <code>Transformer</code>, plus a <code>Tokenizer</code> and sampler. The <a href="api-c.html">C ABI</a> is a thin flattening of this surface for FFI callers.</p>
+<div class="callout note"><div class="callout-title">Reference</div><p>Signatures are copied verbatim from the headers. For the <em>design</em> behind each module see the <a href="architecture.html">architecture book</a> — this page links each header to its chapter. Overloads and private members are omitted; only the public surface a caller drives is shown.</p></div>
+<h2 id="runtime-runtime-h">Runtime — <code>runtime.h</code></h2>
+<p>End-to-end generation: prompt prefill + token-by-token decode. Owns the whole stack.</p>
+<pre><code class="language-cpp">// Open a model file by content sniffing (GGUF or .llmw). Returns a WeightSource.
+std::unique_ptr&lt;WeightSource&gt; open_model(const std::string&amp; path, bool use_mmap = false);</code></pre>
+<p>The <code>GenStats</code> struct <code>generate()</code> fills:</p>
+<pre><code class="language-cpp">struct GenStats {
+    int    prompt_tokens = 0;
+    int    gen_tokens = 0;
+    double load_s = 0;          // model open + config
+    double ttft_s = 0;          // time to first generated token (incl. prefill)
+    double prefill_s = 0;       // prompt processing time
+    double decode_s = 0;        // time generating the rest
+    double prefill_tok_s = 0;   // prompt tokens / prefill_s
+    double decode_tok_s = 0;    // gen tokens / decode_s
+    size_t weights_resident_bytes = 0;
+    int    pinned_layers = 0;   // #37: layers pinned resident under --ram-budget
+    size_t kv_bytes = 0;
+    uint64_t bytes_read = 0;    // total streamed from disk
+    uint64_t prefetch_hits = 0;
+    uint64_t prefetch_misses = 0;
+    int    ctx_used = 0;
+    int    ctx_max = 0;
+};</code></pre>
+<p>The <code>Runtime</code> class:</p>
+<pre><code class="language-cpp">// Takes ownership of the source. opt controls residency/prefetch/mmap.
+// ram_budget_total (bytes, 0 = unlimited) is a TOTAL peak-RSS target; the
+// ctor derives the loader&#x27;s weight ceiling from it (subtracting KV + scratch).
+Runtime(std::unique_ptr&lt;WeightSource&gt; src, LayerLoader::Options opt,
+        int max_ctx = 0, int threads = 0, size_t ram_budget_total = 0, bool force_budget = false);
+
+const ModelConfig&amp; config() const;
+const Tokenizer&amp;   tokenizer() const;
+size_t weights_resident_bytes() const;   // loader_-&gt;resident_bytes()
+size_t kv_bytes() const;                  // kv_-&gt;bytes()
+ThreadPool* thread_pool();
+
+// Streaming callback: each newly produced piece + token id. Return false to
+// stop early. `on_token` may be null.
+using TokenCallback = std::function&lt;bool(const std::string&amp; piece, int64_t id)&gt;;
+
+// Generate up to max_new tokens continuing `prompt`. Fills `stats`.
+std::string generate(const std::string&amp; prompt, int max_new,
+                     SamplerConfig scfg, const TokenCallback&amp; on_token,
+                     GenStats* stats);
+
+size_t peak_rss() const;
+
+// Reset conversation state (KV cache).
+void reset();</code></pre>
+<p>See <a href="runtime.html">Runtime</a> for the design.</p>
+<h2 id="weightsource-weight-source-h">WeightSource — <code>weight_source.h</code></h2>
+<p>The abstraction the loader streams weights through: a tensor directory, typed metadata, and positional reads. Implemented by both <code>GgufFile</code> and the toy <code>ModelFile</code>, so swapping loaders touches no math. See <a href="streaming-loader.html">Streaming loader</a>.</p>
+<pre><code class="language-cpp">// Directory entry for one tensor.
+struct TensorInfo {
+    std::string          name;
+    DType                dtype = DType::F32;
+    std::vector&lt;int64_t&gt; shape;    // row-major; shape[0] is the outer dim
+    uint64_t             offset = 0;   // absolute file offset of raw bytes
+    uint64_t             nbytes = 0;   // bytes on disk (post-quant)
+    int64_t numel() const;
+    int64_t row_elems() const;         // product of all dims except the first
+};</code></pre>
+<pre><code class="language-cpp">class WeightSource {
+public:
+    virtual ~WeightSource() = default;
+
+    virtual const std::vector&lt;TensorInfo&gt;&amp; tensors() const = 0;
+    virtual const TensorInfo* find(const std::string&amp; name) const = 0;
+
+    // Read the tensor&#x27;s raw on-disk bytes into `dst` (capacity &gt;= t.nbytes).
+    // Positional read (pread) — thread-safe, never loads the whole file.
+    virtual void read_raw(const TensorInfo&amp; t, void* dst) const = 0;
+
+    // Read `n` bytes at an absolute file offset (stream a single row).
+    virtual void read_raw_at(uint64_t offset, void* dst, uint64_t n) const = 0;
+
+    virtual const uint8_t* mmap_base() const;   // nullptr unless mmap&#x27;d
+    virtual uint64_t file_size() const = 0;
+
+    virtual bool has_meta(const std::string&amp; key) const = 0;
+    virtual const MetaValue* meta(const std::string&amp; key) const = 0;
+
+    int64_t     meta_int(const std::string&amp; key, int64_t def = 0) const;
+    double      meta_float(const std::string&amp; key, double def = 0) const;
+    std::string meta_str(const std::string&amp; key, const std::string&amp; def = &quot;&quot;) const;
+};</code></pre>
+<div class="callout warn"><div class="callout-title">mmap is not zero-copy</div><p>Even with the mmap backend, the loader&#x27;s <code>read_raw_at</code> memcpys from mapped pages into a resident buffer — the win is OS page-cache buffering, not zero copy. <code>mmap_base()</code> returns the base only if the file is mapped. See <a href="why-not-mmap.html">Why not mmap everything?</a>.</p></div>
+<h2 id="layerloader-loader-h">LayerLoader — <code>loader.h</code></h2>
+<p>Drives transformer blocks through the <code>WeightSource</code> seam so only one (or, double-buffered, two) block&#x27;s weights are resident at a time. See <a href="layer-residency.html">Layer residency</a> and <a href="memory-planner.html">Memory planner</a>.</p>
+<pre><code class="language-cpp">// Per-block weight roles, in consumption order. The core nine:
+enum class Role {
+    AttnNorm = 0, AttnQ, AttnK, AttnV, AttnOut,
+    FfnNorm, FfnGate, FfnUp, FfnDown,
+    // ...optional roles (Qwen2 biases, Gemma post/QK norms, Phi-3 fused QKV,
+    //    Mixtral MoE tensors, GPT-2/Phi-2 biases)...
+    COUNT
+};
+
+enum class Residency { Quantized, FP32 };</code></pre>
+<pre><code class="language-cpp">struct LayerLoader::Options {
+    Residency residency      = Residency::Quantized;
+    int       n_buffers       = 2;      // 1 = strict single block, 2 = double buffer
+    bool      async           = true;   // run the background prefetch thread
+    bool      use_mmap        = false;  // pread by default
+    bool      stream_lm_head  = false;  // stream non-tied LM head off disk
+    ThreadPool* dequant_pool  = nullptr;
+    size_t    ram_budget_bytes = 0;     // 0 = unlimited; else hard weight-RSS ceiling
+    bool      fast_quant      = false;  // opt-in int8 SDOT Q8_0 kernel (--fast)
+};</code></pre>
+<pre><code class="language-cpp">LayerLoader(WeightSource* src, ModelConfig cfg, Options opt);
+
+// Make `layer` resident and current. Blocks until ready. Returns true.
+bool loadLayer(int layer);
+// Release the current block for reuse (double-buffer recycling).
+void unloadLayer();
+// Weight from the current resident block.
+WeightRef getWeight(Role role) const;
+
+// ---- global (always-resident) weights ----
+// Write the embedding row for `token` (cfg.dim fp32 values) into dst.
+void embed_token(int64_t token, float* dst) const;
+WeightRef output_norm_weight() const;   // fp32, [dim]
+WeightRef output_weight() const;         // native dtype, [vocab, dim]
+// y = lm_head @ x -&gt; logits. Streams the LM head off disk when non-tied.
+void project_output(const float* x, float* y, ThreadPool* pool) const;
+
+const ModelConfig&amp; config() const;
+size_t resident_bytes() const;           // approx current RAM for weights
+int    pinned_layers() const;            // resident hot layers (#37)</code></pre>
+<h2 id="transformer-transformer-h">Transformer — <code>transformer.h</code></h2>
+<p>The decoder forward pass; every weight is fetched through <code>LayerLoader</code>. See <a href="transformer.html">Transformer</a>.</p>
+<pre><code class="language-cpp">Transformer(LayerLoader* loader, KVCache* kv, ThreadPool* pool = nullptr);
+
+// Run one token at absolute position `pos`; returns a pointer to the vocab
+// logits (owned by the Transformer, valid until the next forward call).
+const float* forward(int64_t token, int64_t pos);
+
+// Single-pass batched prefill (RFC-007): stream every layer EXACTLY ONCE over
+// all `n` positions [start_pos, start_pos+n). Returns the LAST position&#x27;s
+// logits; KV cache + logits are IDENTICAL to calling forward() per token.
+const float* prefill(const int64_t* tokens, int64_t n, int64_t start_pos);
+
+// RoPE (exposed for testing). Optional llama3 frequency scaling via RopeScaling.
+struct RopeScaling {
+    bool  llama3 = false;
+    float factor = 8.f;
+    float low_freq_factor = 1.f;
+    float high_freq_factor = 4.f;
+    float orig_ctx_len = 8192.f;
+};
+static void apply_rope(float* vec, int64_t n_heads, int64_t head_dim,
+                       int64_t pos, float theta_base);
+static void apply_rope(float* vec, int64_t n_heads, int64_t head_dim,
+                       int64_t pos, float theta_base, const RopeScaling&amp; rs);
+
+const ModelConfig&amp; config() const;
+size_t peak_rss() const;</code></pre>
+<div class="callout note"><div class="callout-title">RoPE convention</div><p><code>apply_rope</code> is adjacent-pair (ggml <code>rope_norm</code>), not HF <code>rotate_half</code>; it relies on GGUF weights being permuted at conversion. Sliding-window attention is <strong>not</strong> modeled for Mistral/Gemma3 (they attend the full causal range).</p></div>
+<h2 id="modelconfig-model-h">ModelConfig — <code>model.h</code></h2>
+<p>Decoder configuration, resolved from GGUF metadata (<code>general.architecture</code> &rarr; the <code>Arch</code> dispatch enum). See <a href="gguf-parser.html">GGUF parser</a>.</p>
+<pre><code class="language-cpp">// Build from a WeightSource&#x27;s metadata (GGUF &quot;&lt;arch&gt;.*&quot; or toy .llmw keys).
+static ModelConfig from_source(const WeightSource&amp; src);</code></pre>
+<p>Key fields (defaults keep every Llama/toy model on the reference path):</p>
+<pre><code class="language-cpp">std::string arch = &quot;llama&quot;;          // raw GGUF string
+Arch        arch_kind = Arch::Llama; // resolved dispatch enum
+int64_t n_layers   = 0;
+int64_t n_heads    = 0;
+int64_t n_kv_heads = 0;              // &lt; n_heads =&gt; GQA
+int64_t dim        = 0;              // hidden size / embedding length
+int64_t head_dim   = 0;              // usually dim / n_heads
+int64_t ffn_dim    = 0;              // feed-forward intermediate size
+int64_t vocab_size = 0;
+int64_t ctx_len    = 0;              // trained context length
+float   rope_theta = 10000.f;
+float   rms_eps    = 1e-5f;
+bool    tie_embeddings = false;      // output projection shares token_embd</code></pre>
+<p>Derived dimensions:</p>
+<pre><code class="language-cpp">int64_t q_dim()  const { return n_heads * head_dim; }
+int64_t kv_dim() const { return n_kv_heads * head_dim; }
+int64_t gqa_group() const { return n_heads / n_kv_heads; }</code></pre>
+<div class="callout note"><div class="callout-title">Architecture coverage</div><p>The <code>Arch</code> enum dispatches <code>Llama, Mistral, Qwen2, Gemma2, Gemma3, Phi3, Phi2, GPT2, Unknown</code>. An unrecognized string (e.g. &quot;nemo&quot;/Mistral-Nemo) falls back to <code>Unknown</code> &rarr; the Llama path, which works because such models are Llama-like and <code>head_dim</code> is read explicitly.</p></div>
+<p>The resident-weight value type the transformer consumes:</p>
+<pre><code class="language-cpp">struct WeightRef {
+    const void* data   = nullptr;
+    DType       dtype  = DType::F32;
+    int64_t     n_out  = 0;
+    int64_t     n_in   = 0;
+    bool valid() const;
+};</code></pre>
+<h2 id="tokenizer-tokenizer-h">Tokenizer — <code>tokenizer.h</code></h2>
+<p>Text &harr; token ids, driven from GGUF <code>tokenizer.ggml.*</code> metadata. See <a href="tokenizer.html">Tokenizer</a>.</p>
+<pre><code class="language-cpp">enum class Kind { Byte, SentencePiece, BPE };
+
+// Build from a model&#x27;s tokenizer metadata; falls back to Byte if absent.
+static Tokenizer from_source(const WeightSource&amp; src);
+static Tokenizer byte_tokenizer(int64_t vocab = 256);
+
+std::vector&lt;int64_t&gt; encode(const std::string&amp; text, bool add_bos = true) const;
+std::string          decode(const std::vector&lt;int64_t&gt;&amp; ids) const;
+std::string          decode_token(int64_t id) const;   // one token (streaming UI)
+
+Kind    kind() const;
+int64_t vocab_size() const;
+int64_t bos_id() const;
+int64_t eos_id() const;
+bool    is_eog(int64_t id) const;      // end-of-generation?</code></pre>
+<div class="callout note"><div class="callout-title">No chat template</div><p>The engine adds BOS only on a fresh sequence and applies <strong>no</strong> chat/prompt template — inference is over raw text. Conversation formatting is the caller&#x27;s job.</p></div>
+<h2 id="kvcache-kv-cache-h">KVCache — <code>kv_cache.h</code></h2>
+<p>Grow-on-demand K/V storage indexed <code>[layer][pos][kv_dim]</code>. Starts small and doubles (capped at <code>max_ctx</code>), re-laying-out rows on growth — bitwise-identical to full preallocation. See <a href="kv-cache.html">KV cache</a>.</p>
+<pre><code class="language-cpp">KVCache(int64_t n_layers, int64_t kv_dim, int64_t max_ctx);
+
+int64_t max_ctx()  const;
+int64_t kv_dim()   const;
+int64_t n_layers() const;
+int64_t seq_len()  const;
+int64_t capacity() const;              // currently-resident positions
+
+void set_seq_len(int64_t n);           // grows backing store if needed
+void clear();
+
+float*       k(int64_t layer, int64_t pos);        // write path: grows to fit
+float*       v(int64_t layer, int64_t pos);
+const float* k(int64_t layer, int64_t pos) const;  // read path: never grows
+const float* v(int64_t layer, int64_t pos) const;
+
+size_t bytes() const;                  // true resident footprint</code></pre>
+<h2 id="ops-ops-h">ops — <code>ops.h</code></h2>
+<p>Pure numeric kernels over fp32 buffers. Weight convention: <code>W</code> is <code>[n_out, n_in]</code> row-major. See <a href="transformer.html">Transformer</a>.</p>
+<pre><code class="language-cpp">void vec_add(float* out, const float* a, const float* b, int64_t n);
+void vec_add_inplace(float* x, const float* y, int64_t n);
+
+// RMSNorm: out[i] = x[i] / sqrt(mean(x^2) + eps) * weight[i]
+void rmsnorm(float* out, const float* x, const float* weight, int64_t n, float eps = 1e-5f);
+// Gemma-style RMSNorm: learned scale is (1 + weight)
+void rmsnorm_gemma(float* out, const float* x, const float* weight, int64_t n, float eps = 1e-6f);
+
+void softmax(float* x, int64_t n);                     // numerically stable, in place
+void silu_inplace(float* x, int64_t n);                // x * sigmoid(x)
+void gelu_inplace(float* x, int64_t n);                // tanh-approx GELU
+void softcap_inplace(float* x, int64_t n, float cap);  // cap * tanh(x/cap); cap&lt;=0 no-op
+
+// LayerNorm (GPT-2 / Phi-2): (x-mean)/sqrt(var+eps) * weight + bias; bias may be null.
+void layernorm(float* out, const float* x, const float* weight, const float* bias,
+               int64_t n, float eps = 1e-5f);
+
+// Single-vector (batch=1) linear: y = W @ x. Row-parallel across the pool.
+void matmul(float* y, const float* W, const float* x,
+            int64_t n_out, int64_t n_in, ThreadPool* pool = nullptr);
+// Batched linear: Y = X @ W^T (prompt prefill).
+void matmul_batch(float* Y, const float* X, const float* W,
+                  int64_t m, int64_t n_out, int64_t n_in, ThreadPool* pool = nullptr);</code></pre>
+<h2 id="quant-quant-h">quant — <code>quant.h</code></h2>
+<p>Dequantization for the common GGUF family + reference quantizers. See <a href="quantization.html">Quantization</a>.</p>
+<pre><code class="language-cpp">float    fp16_to_fp32(uint16_t h);
+uint16_t fp32_to_fp16(float f);
+float    bf16_to_fp32(uint16_t h);
+
+// Expand `n` logical elements of type `t` from `src` into `dst` (fp32).
+void dequantize_row(DType t, const void* src, float* dst, int64_t n);
+
+// y = W @ x where W is [n_out, n_in] stored as type `t`. Dequantizes one output
+// row at a time into scratch — why a whole layer stays quantized in RAM.
+void matmul_quant(float* y, const void* W, DType t, const float* x,
+                  int64_t n_out, int64_t n_in, ThreadPool* pool = nullptr);
+
+// Reference quantizers (tests / fixtures). n a multiple of 32.
+void quantize_q8_0(const float* src, void* dst, int64_t n);
+void quantize_q4_0(const float* src, void* dst, int64_t n);</code></pre>
+<div class="callout warn"><div class="callout-title">Dequant coverage</div><p>Supported: F32, F16, BF16, Q4_0/1, Q5_0/1, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K, IQ4_NL. <strong>Q8_1 and Q8_K are NOT dequantizable</strong> (they throw). Only Q4_K/Q6_K have NEON fast paths; the int8 SDOT <code>--fast</code> kernel is Q8_0-only, ARM-only (<code>__ARM_FEATURE_DOTPROD</code>), and an approximation — the fp32-dequant path is the correctness oracle.</p></div>
+<h2 id="linear-linear-h">linear — <code>linear.h</code></h2>
+<p>The single projection call the transformer uses; dispatches on the resident weight&#x27;s dtype so callers never branch on quantization.</p>
+<pre><code class="language-cpp">inline void linear(float* y, const WeightRef&amp; W, const float* x, ThreadPool* pool = nullptr);
+// F32 -&gt; matmul; Q8_0 + --fast -&gt; int8 SDOT; else -&gt; matmul_quant.</code></pre>
+<h2 id="dtype-dtype-h">DType — <code>dtype.h</code></h2>
+<p>Element types whose numeric values mirror ggml&#x27;s <code>enum ggml_type</code>.</p>
+<pre><code class="language-cpp">enum class DType : int32_t {
+    F32 = 0, F16 = 1, Q4_0 = 2, Q4_1 = 3, Q5_0 = 6, Q5_1 = 7,
+    Q8_0 = 8, Q8_1 = 9, Q2_K = 10, Q3_K = 11, Q4_K = 12, Q5_K = 13,
+    Q6_K = 14, Q8_K = 15, IQ4_NL = 20, BF16 = 30, COUNT = 39,
+};
+
+const TypeTraits&amp; type_traits(DType t);
+int64_t type_nbytes(DType t, int64_t n_elements);   // bytes for n elements
+const char* dtype_name(DType t);</code></pre>
+<h2 id="threadpool-thread-pool-h">ThreadPool — <code>thread-pool.h</code></h2>
+<p>A minimal persistent worker pool for data-parallel loops (the matmul row split). See <a href="thread-pool.html">Thread pool</a>.</p>
+<pre><code class="language-cpp">explicit ThreadPool(int n_threads = 0);   // &lt;=0 =&gt; hardware_concurrency
+
+int size() const;
+
+enum class SchedulePolicy {
+    Static, Fixed8, Fixed16, Fixed32, Proportional2, Proportional4, Adaptive
+};
+void set_policy(SchedulePolicy p);
+
+void parallel_for(int64_t total,
+                  const std::function&lt;void(int, int64_t, int64_t)&gt;&amp; fn);
+
+// Process-wide default pool, lazily created.
+ThreadPool&amp; default_pool();</code></pre>
+<h2 id="see-also">See also</h2>
+<ul><li><a href="api-c.html">C ABI reference</a> — the FFI-safe flattening of this surface.</li><li><a href="architecture.html">Architecture book</a> — the design chapter for every module above.</li><li><a href="api-dart.html">Dart / Flutter reference</a> — the top-level binding.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="api-c.html"><span>Previous</span>C ABI</a><a class="pn next" href="api-dart.html"><span>Next</span>Dart / Flutter</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#runtime-runtime-h">Runtime — runtime.h</a></li><li class="toc-h2"><a href="#weightsource-weight-source-h">WeightSource — weight_source.h</a></li><li class="toc-h2"><a href="#layerloader-loader-h">LayerLoader — loader.h</a></li><li class="toc-h2"><a href="#transformer-transformer-h">Transformer — transformer.h</a></li><li class="toc-h2"><a href="#modelconfig-model-h">ModelConfig — model.h</a></li><li class="toc-h2"><a href="#tokenizer-tokenizer-h">Tokenizer — tokenizer.h</a></li><li class="toc-h2"><a href="#kvcache-kv-cache-h">KVCache — kv_cache.h</a></li><li class="toc-h2"><a href="#ops-ops-h">ops — ops.h</a></li><li class="toc-h2"><a href="#quant-quant-h">quant — quant.h</a></li><li class="toc-h2"><a href="#linear-linear-h">linear — linear.h</a></li><li class="toc-h2"><a href="#dtype-dtype-h">DType — dtype.h</a></li><li class="toc-h2"><a href="#threadpool-thread-pool-h">ThreadPool — thread-pool.h</a></li><li class="toc-h2"><a href="#see-also">See also</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

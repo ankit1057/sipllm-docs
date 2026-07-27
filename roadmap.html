@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="roadmap">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap · SipLLM docs</title>
+<meta name="description" content="No number below is a benchmark. Per the engineering charter, speculation and future ideas are kept strictly separate from measured facts. Items here earn the…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html" class="active" aria-current="page">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Product <span aria-hidden="true">/</span> Roadmap</div>
+      <h1>Roadmap</h1>
+      <div class="hero"><p class="lead"><strong>Everything on this page is planned, not measured.</strong> The shipped, measured state lives in the North Star scorecard (<a href="benchmarks.html">Benchmarks</a>) and the <a href="performance-history.html">performance history</a>. This page is the ranked forward look — engine throughput moats first, then productization.</p></div>
+<div class="callout warn"><div class="callout-title">Planned ≠ measured</div><p>No number below is a benchmark. Per the engineering charter, speculation and future ideas are kept strictly separate from measured facts. Items here earn their place only if they reduce peak RSS, raise throughput/expansion factor, improve correctness, or improve portability.</p></div>
+<h2 id="v0-5-the-documentation-portal">v0.5 — the documentation portal</h2>
+<p>The current milestone is <strong>this portal</strong>: a static, self-contained docs site (product pages, the architecture book, the API reference, the engineering journal, and project meta) rendered by a stdlib generator (<code>docs/build.py</code>) with every number sourced from the committed North Star scorecard. Goal: make the streaming thesis and its evidence navigable, so the <em>why</em> is as legible as the <em>what</em>.</p>
+<p>History to date: tags v0.1.0 → v0.1.1 → v0.4.0 across 35 commits; the project began as a &quot;Streaming GGUF LLM inference engine (C++17)&quot; and reached a Developer Preview at v0.4.0.</p>
+<h2 id="engine-roadmap-ranked">Engine roadmap (ranked)</h2>
+<div class="card-grid"><div class="card"><h3>1 · K-quant int-dot</h3><p>Today the <code>--fast</code> int8 SDOT kernel is <strong>Q8_0-only</strong> and ARM-only; K-quant (Q4_K) decode still runs the fp32-dequant path. Extending integer dot to K-quants brings Q8-class speed to 4-bit models — the biggest RAM headline and the strongest next demo.</p></div><div class="card"><h3>2 · Speculative / pipelined streaming</h3><p>In the exceeds-RAM regime decode is disk-bandwidth-bound (arithmetic intensity Θ(1)). Speculative streaming amortizes weight movement across tokens — the long-term throughput moat for models that do not fit.</p></div><div class="card"><h3>3 · Wider prefetch + NEON K-quant</h3><p>Deeper prefetch pipelining (the unused <code>FileBacking::prefetch()</code> <code>fadvise</code>/<code>madvise</code> readahead hook) and NEON dequant fast paths beyond the current Q4_K/Q6_K coverage.</p></div><div class="card"><h3>4 · Vulkan matmul &rarr; full-layer offload</h3><p>The GPU path is a stub today (see below). The plan: land a working <code>vulkan_matmul</code> compute-shader dispatch, then a full-layer offload for the rare edge device with a usable GPU. CPU stays the primary, correctness-defining target.</p></div><div class="card"><h3>5 · Android on-device verification</h3><p>Wave 8 (Flutter FFI, downloader, embedding store, Wear transfer) is host-verified on Apple M3 but <strong>not</strong> yet runtime-verified on a phone. Verifying the Android APK / on-device inference (POCO X6 Pro) and Wear transfer (OnePlus Watch 2) is the remainder of milestone M6.5.</p></div></div>
+<h2 id="the-gpu-caveat-up-front">The GPU caveat, up front</h2>
+<div class="callout warn"><div class="callout-title">Vulkan is detection-only today</div><p><code>make VULKAN=1</code> enables device <em>detection</em> and deliberately rejects CPU software rasterizers (llvmpipe). But <code>vulkan_matmul</code> <strong>always falls back to CPU and returns false</strong> — the compute-shader dispatch is omitted even when <code>matmul.comp</code>/SPIR-V is embedded. The &quot;Vulkan matmul → full-layer offload&quot; item above is precisely the work of making that path real. Until it lands, do not treat SipLLM as GPU-accelerated.</p></div>
+<h2 id="not-on-the-roadmap">Not on the roadmap</h2>
+<p>Per the <a href="vision.html">vision guardrail</a>, Studio will <strong>not</strong> grow new inference architectures or model families to chase parity. The engine&#x27;s architecture set is deliberate; forward work sharpens bounded-memory streaming, not breadth. Correctness is never traded for speed — every backend and budget must keep the <a href="benchmarks.html">golden matrix</a> green.</p>
+<div class="callout note"><div class="callout-title">Where the ranking comes from</div><p>The order follows the charter&#x27;s Rule 0 (measure → rank by impact × leverage × differentiation) and the current North Star &quot;largest bottleneck&quot;: Q8 <code>--fast</code> is within ~12% of llama.cpp, so the two open fronts are 4-bit (Q4_K) decode speed and streaming-regime throughput. See <a href="benchmarks.html">Benchmarks</a> for the measured baseline these plans build on.</p></div>
+      <nav class="page-footer-nav"><a class="pn prev" href="vision.html"><span>Previous</span>Vision</a><a class="pn next" href="benchmarks.html"><span>Next</span>Benchmarks</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#v0-5-the-documentation-portal">v0.5 — the documentation portal</a></li><li class="toc-h2"><a href="#engine-roadmap-ranked">Engine roadmap (ranked)</a></li><li class="toc-h2"><a href="#the-gpu-caveat-up-front">The GPU caveat, up front</a></li><li class="toc-h2"><a href="#not-on-the-roadmap">Not on the roadmap</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

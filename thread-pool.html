@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="thread-pool">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thread pool &amp; scheduling · SipLLM docs</title>
+<meta name="description" content="Problem → Design → Alternatives → Tradeoffs → Source → Future. Every matmul in the transformer — fp32, quantized, or SDOT — splits its output rows across thi…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html" class="active" aria-current="page">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Architecture <span aria-hidden="true">/</span> Thread pool</div>
+      <h1>Thread pool &amp; scheduling</h1>
+      <div class="callout note"><div class="callout-title">Architecture book</div><p><strong>Problem → Design → Alternatives → Tradeoffs → Source → Future.</strong> Every matmul in the <a href="transformer.html">transformer</a> — fp32, <a href="quantization.html">quantized</a>, or SDOT — splits its output rows across this pool. The <a href="auto-tuning.html">auto-tuner</a> picks how many workers and which schedule; this page is what it picks <em>between</em>.</p></div>
+<h2 id="problem">Problem</h2>
+<p>The hot path is matmul, and the parallel unit is the output row: worker <code>w</code> computes a disjoint slice of <code>y</code>&#x27;s rows. Spawning threads per matmul would let thread-creation dominate a per-token workload that fires dozens of small matmuls. And the right way to <em>split</em> those rows is not fixed: a big even LM-head projection wants contiguous no-overhead slices, while a lumpy quantized layer (rows dequantize at different costs) wants dynamic load balancing. One pool has to serve both without re-spawning.</p>
+<h2 id="design">Design</h2>
+<p><code>ThreadPool</code> (<code>include/llm/threadpool.h</code>) holds persistent workers and hands them <code>[begin, end)</code> row ranges through a <code>parallel_for</code> barrier. It spawns <code>n_ - 1</code> worker threads (the calling thread also works), defaulting to <code>hardware_concurrency</code> with headroom left so the OS and the prefetch thread stay responsive on a phone. On Apple platforms workers set <code>QOS_CLASS_USER_INTERACTIVE</code>.</p>
+<p><code>parallel_for(total, fn)</code> publishes the range and a per-policy <strong>chunk size</strong>, bumps a generation counter, and wakes the workers; each drains work and the caller waits on a barrier. The seven <code>SchedulePolicy</code> values differ <em>only</em> in that chunk size and whether draining is contiguous or work-stealing:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Policy</th><th class="a-left">chunk_</th><th class="a-left">Loop</th></tr></thead><tbody><tr><td class="a-left"><code>Static</code></td><td class="a-left"><code>ceil(total / n_)</code></td><td class="a-left">contiguous — worker <code>tid</code> takes <code>[tid·chunk, …)</code>, <strong>no stealing</strong></td></tr><tr><td class="a-left"><code>Fixed8</code></td><td class="a-left">8</td><td class="a-left">dynamic work-stealing</td></tr><tr><td class="a-left"><code>Fixed16</code></td><td class="a-left">16</td><td class="a-left">dynamic work-stealing</td></tr><tr><td class="a-left"><code>Fixed32</code></td><td class="a-left">32</td><td class="a-left">dynamic work-stealing</td></tr><tr><td class="a-left"><code>Proportional2</code></td><td class="a-left"><code>max(1, total / (n_·2))</code></td><td class="a-left">dynamic work-stealing</td></tr><tr><td class="a-left"><code>Proportional4</code></td><td class="a-left"><code>max(1, total / (n_·4))</code></td><td class="a-left">dynamic work-stealing</td></tr><tr><td class="a-left"><code>Adaptive</code></td><td class="a-left"><code>max(16, total / (n_·4))</code></td><td class="a-left">dynamic work-stealing</td></tr></tbody></table></div>
+<p><strong>Static</strong> gives each worker one contiguous block and returns — lowest overhead, best when every row costs the same. <strong>Every other policy</strong> runs the dynamic loop: <code>next_row_.fetch_add(chunk_)</code> atomically claims the next chunk until the rows run out, so a worker that finishes cheap rows steals more instead of idling. Proportional sizes the chunk to the row count (finer for more workers); Adaptive is Proportional4 with a floor of 16 to avoid pathologically tiny chunks on small matmuls.</p>
+<h3 id="parallel-vs-serial-thresholds">Parallel-vs-serial thresholds</h3>
+<p>Small matmuls skip the pool entirely — barrier and wakeup cost more than the work:</p>
+<ul><li><strong>fp32 <code>matmul</code></strong> parallelizes only when <code>pool-&gt;size() &gt; 1 &amp;&amp; n_out &gt;= 64</code> (<code>src/ops.cpp</code>).</li><li><strong><code>matmul_quant</code></strong> and the <strong><code>matmul_q8_0_i8</code> SDOT</strong> kernel use <code>n_out &gt;= 32</code> (<code>src/quant.cpp</code>, <code>src/neon.cpp</code>) — quantized rows are heavier per row, so the crossover is lower.</li></ul>
+<p>Below the threshold the body runs inline on the calling thread.</p>
+<h3 id="defaults">Defaults</h3>
+<ul><li><strong>CLI default: <code>Proportional2</code></strong> (<code>main.cpp</code>; the C FFI default too — <code>SIPLLM_SCHED_PROPORTIONAL2</code>).</li><li><strong>Pool default: <code>Proportional4</code></strong> (<code>ThreadPool::policy</code> initializer) — the value a freshly constructed pool carries before anyone calls <code>set_policy</code>.</li></ul>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Approach</th><th class="a-left">Why not the default</th></tr></thead><tbody><tr><td class="a-left">Spawn threads per matmul</td><td class="a-left">Thread creation dominates a per-token workload of many small matmuls.</td></tr><tr><td class="a-left">Pure static partition only</td><td class="a-left">Idles workers on lumpy quantized layers where rows cost unequally.</td></tr><tr><td class="a-left">Pure work-stealing only</td><td class="a-left">The atomic <code>fetch_add</code> per chunk is pure overhead when rows are uniform and large — <code>Static</code> avoids it.</td></tr><tr><td class="a-left">Always parallelize</td><td class="a-left">Barrier/wakeup cost exceeds the work below ~32–64 rows; hence the thresholds.</td></tr></tbody></table></div>
+<h2 id="tradeoffs">Tradeoffs</h2>
+<ul><li><strong>Policy only sets chunk size + steal-vs-contiguous.</strong> It does not change the math or the result — <code>tests/test_ops.cpp</code> checks every policy produces the same output as the serial path.</li><li><strong><code>steals</code> is a proxy.</strong> The <code>Stats</code> counter increments on any chunk beginning past row 0, not on a true steal event — a coarse signal, not an exact steal count.</li><li><strong>Only 4 of the 7 policies are auto-benchmarked.</strong> The <a href="auto-tuning.html">auto-tuner</a> sweeps <code>Static, Fixed16, Proportional2, Adaptive</code> (using <code>Fixed16</code> as the baseline while it finds the best thread count), then caches the winner. <code>Fixed8</code>, <code>Fixed32</code>, and <code>Proportional4</code> are selectable by hand but never chosen automatically.</li><li><strong>Thread count is capped at 16</strong> by the auto-tuner, with no big.LITTLE / core-cluster detection — it treats cores as uniform. The tuner picks threads + policy only; it does <strong>not</strong> choose the RAM budget (that is the separate memory planner).</li></ul>
+<h2 id="source-files">Source files</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">File</th><th class="a-left">Role</th></tr></thead><tbody><tr><td class="a-left"><code>include/llm/threadpool.h</code></td><td class="a-left"><code>ThreadPool</code>, <code>SchedulePolicy</code>, <code>parallel_for</code>, <code>run_chunk</code> (static vs work-stealing), <code>Stats</code>, <code>default_pool()</code></td></tr><tr><td class="a-left"><code>src/ops.cpp</code></td><td class="a-left">fp32 <code>matmul</code> — <code>n_out &gt;= 64</code> parallel threshold</td></tr><tr><td class="a-left"><code>src/quant.cpp</code></td><td class="a-left"><code>matmul_quant</code> — <code>n_out &gt;= 32</code> threshold</td></tr><tr><td class="a-left"><code>src/neon.cpp</code></td><td class="a-left"><code>matmul_q8_0_i8</code> SDOT — <code>n_out &gt;= 32</code> threshold</td></tr><tr><td class="a-left"><code>src/auto_tuner.cpp</code></td><td class="a-left">the 4-policy + thread-count micro-benchmark that selects the default</td></tr></tbody></table></div>
+<h2 id="future-work">Future work</h2>
+<ul><li><strong>Auto-benchmark all 7 policies</strong> (and expose <code>Proportional4</code>/<code>Fixed32</code> to the tuner) rather than a fixed 4-way sweep.</li><li><strong>big.LITTLE awareness</strong> — detect performance vs efficiency cores and bias chunking/affinity instead of assuming uniform cores.</li><li><strong>True steal accounting</strong> to replace the row-0 proxy, for honest scheduler telemetry.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="tokenizer.html"><span>Previous</span>Tokenizer</a><a class="pn next" href="auto-tuning.html"><span>Next</span>Auto-tuning</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#problem">Problem</a></li><li class="toc-h2"><a href="#design">Design</a></li><li class="toc-h3"><a href="#parallel-vs-serial-thresholds">Parallel-vs-serial thresholds</a></li><li class="toc-h3"><a href="#defaults">Defaults</a></li><li class="toc-h2"><a href="#alternatives-considered">Alternatives considered</a></li><li class="toc-h2"><a href="#tradeoffs">Tradeoffs</a></li><li class="toc-h2"><a href="#source-files">Source files</a></li><li class="toc-h2"><a href="#future-work">Future work</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

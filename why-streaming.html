@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="why-streaming">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why streaming? · SipLLM docs</title>
+<meta name="description" content="The core argument Loading a model resident makes peak RSS scale with model size: ~1.1&amp;nbsp;GB for a 1.1&amp;nbsp;B Q8 model, tens of GB for a 70&amp;nbsp;B one. But …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html" class="active" aria-current="page">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Product <span aria-hidden="true">/</span> Why streaming?</div>
+      <h1>Why streaming?</h1>
+      <div class="hero"><p class="lead"><strong>Because an LLM's weights dwarf its activations, and a decoder only touches one transformer block at a time.</strong> If exactly one block is made resident and its memory reused for the next, peak weight RSS tracks <em>layer width</em>, not <em>model size</em> — and a model many times larger than RAM still runs.</p></div>
+<h2 id="the-core-argument">The core argument</h2>
+<p>Loading a model resident makes peak RSS scale with <em>model size</em>: ~1.1&nbsp;GB for a 1.1&nbsp;B Q8 model, tens of GB for a 70&nbsp;B one. But block <code>L</code>&#x27;s weights are needed <strong>only while block <code>L</code> runs</strong>. Reuse one block&#x27;s worth of memory across the whole depth and the dominant memory term collapses:</p>
+<pre><code class="language-text">peak RSS  ≈  one transformer layer  +  KV cache
+          (flat across the whole model depth)</code></pre>
+<div class="callout key"><div class="callout-title">Peak RSS = layer width, not model size</div><p>A deeper model of the same width has <em>flat</em> peak RSS. The <code>toy_scaling</code> benchmark holds resident weights <strong>flat at ~1.5 MB</strong> across 4-, 16-, and 32-layer toy models — depth changed, footprint did not.</p></div>
+<p>This is the whole thesis, and it is measured, not asserted. On a 16&nbsp;GB Mac with ~3&nbsp;GB free (where loading these resident is impossible), <code>--stream-lm-head --no-async --ctx 512</code>, greedy:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Weights on disk</th><th class="a-right">Peak RSS</th><th class="a-right">Model ÷ RSS</th></tr></thead><tbody><tr><td class="a-left">TinyLlama-1.1B (Q8_0)</td><td class="a-right">1.17 GB</td><td class="a-right">61 MB</td><td class="a-right">19×</td></tr><tr><td class="a-left">Llama-3.1-8B (Q4_K_M)</td><td class="a-right">4.92 GB</td><td class="a-right">204 MB</td><td class="a-right">24×</td></tr><tr><td class="a-left">Llama-2-13B (Q4_K_M)</td><td class="a-right">7.87 GB</td><td class="a-right">317 MB</td><td class="a-right">25×</td></tr></tbody></table></div>
+<p>A 13&nbsp;B model runs in <strong>317 MB — 25× smaller than its own weights</strong> — on a machine that cannot hold it. See <a href="j-bigger-than-ram.html">Bigger than RAM</a> for the full story.</p>
+<h2 id="the-seam-that-makes-it-safe">The seam that makes it safe</h2>
+<p>The transformer never opens a file. It talks to a <strong><code>WeightSource</code></strong> (<code>include/llm/weight_source.h</code>): a tensor directory plus positional reads (<code>read_raw_at</code>, a <code>pread</code> that never loads the whole file). <code>LayerLoader</code> (<code>src/loader.cpp</code>) reads block <code>L</code> into a slot buffer and recycles that slot for the next layer, so <strong>swapping the loader or the residency strategy touches no line of math.</strong> Two mechanisms keep only a layer live:</p>
+<div class="card-grid"><div class="card"><h3>Per-layer residency</h3><p><code>loadLayer(L)</code> reads block <code>L</code> into a recycled slot; the synchronous single-buffer path keeps exactly one block resident. See <a href="layer-residency.html">Layer residency</a>.</p></div><div class="card"><h3>Weights stay quantized</h3><p><code>matmul_quant</code> dequantizes <em>one output row</em> into a tiny scratch buffer, dots it, and moves on — a whole layer stays ~4 bits/weight in RAM instead of 32. See <a href="quantization.html">Quantization</a>.</p></div></div>
+<p>Three interchangeable backends — synchronous <code>pread</code> (<code>--no-async</code>), an async double-buffered <a href="prefetch.html">prefetch</a> ring (default), and <a href="why-not-mmap.html"><code>mmap</code></a> — all produce identical logits. See <a href="streaming-loader.html">Streaming layer loader</a>.</p>
+<h2 id="the-ram-speed-dial">The RAM↔speed dial</h2>
+<p>Streaming trades <strong>disk bandwidth for memory</strong>. In the bounded-memory extreme (budget 0) decode is disk-bound — arithmetic intensity is Θ(1), so an off-cache model runs well under 1 tok/s. <code>--ram-budget N</code> buys the speed back linearly: it pins as many contiguous hot layers <code>[0, n_pinned)</code> resident as fit under a hard ceiling and re-streams fewer per token.</p>
+<p>Measured (Apple M3, warm cache, <code>--ctx 512</code>, median-of-3):</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Budget</th><th class="a-right">Pinned</th><th class="a-right">Decode tok/s</th><th class="a-right">Streamed</th><th class="a-right">Peak RSS</th></tr></thead><tbody><tr><td class="a-left">tinyllama</td><td class="a-right">0 (stream)</td><td class="a-right">0/22</td><td class="a-right">11.4</td><td class="a-right">14411 MB</td><td class="a-right">121 MB</td></tr><tr><td class="a-left">tinyllama</td><td class="a-right">512M</td><td class="a-right">13/22</td><td class="a-right">15.5</td><td class="a-right">6155 MB</td><td class="a-right">480 MB</td></tr><tr><td class="a-left">tinyllama</td><td class="a-right">768M</td><td class="a-right">22/22</td><td class="a-right">22.1</td><td class="a-right">576 MB</td><td class="a-right">644 MB</td></tr><tr><td class="a-left">smollm2</td><td class="a-right">0 (stream)</td><td class="a-right">0/30</td><td class="a-right">53.1</td><td class="a-right">2824 MB</td><td class="a-right">54 MB</td></tr><tr><td class="a-left">smollm2</td><td class="a-right">256M</td><td class="a-right">30/30</td><td class="a-right">65.9</td><td class="a-right">113 MB</td><td class="a-right">161 MB</td></tr></tbody></table></div>
+<div class="callout measured"><div class="callout-title">Bit-identical at any budget</div><p>Pinning is a pure cache: <code>tests/test_ram_budget.cpp</code> proves logits + KV are bit-for-bit identical across the whole budget sweep and that the hard ceiling holds. The dial changes <em>where</em> the bytes live, never <em>what</em> the math computes.</p></div>
+<h2 id="when-streaming-wins">When streaming wins</h2>
+<ul><li><strong>Edge devices with lots of storage, little RAM/VRAM</strong> — phones, SBCs, embedded Linux. The exact target SipLLM was built for.</li><li><strong>Running a model that otherwise would not fit at all</strong> — the bounded-memory extreme is slow, but the alternative is &quot;cannot run.&quot;</li><li><strong>A hard peak-RSS ceiling matters</strong> — when the OS must not fault the whole model in. This is the key difference from <a href="why-not-mmap.html">mmap</a>, which has no hard ceiling.</li></ul>
+<p>Where the model comfortably fits in RAM and you want maximum throughput, a mature resident runtime is the better tool — SipLLM sits at ~88% of llama.cpp&#x27;s decode at 2.1× less RAM (TinyLlama Q8, resident). See <a href="why-another-runtime.html">Why another runtime?</a> for the honest positioning.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="what-is-sipllm.html"><span>Previous</span>What is SipLLM?</a><a class="pn next" href="why-not-mmap.html"><span>Next</span>Why not mmap everything?</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-core-argument">The core argument</a></li><li class="toc-h2"><a href="#the-seam-that-makes-it-safe">The seam that makes it safe</a></li><li class="toc-h2"><a href="#the-ram-speed-dial">The RAM↔speed dial</a></li><li class="toc-h2"><a href="#when-streaming-wins">When streaming wins</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

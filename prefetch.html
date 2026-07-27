@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="prefetch">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predictive prefetch · SipLLM docs</title>
+<meta name="description" content="Problem → Design → Alternatives → Tradeoffs → Source → Future. The async double-buffered ring hides I/O latency behind compute so a streamed layer feels almo…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html" class="active" aria-current="page">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Architecture <span aria-hidden="true">/</span> Prefetch</div>
+      <h1>Predictive prefetch</h1>
+      <div class="callout note"><div class="callout-title">Architecture book</div><p><strong>Problem → Design → Alternatives → Tradeoffs → Source → Future.</strong> The async double-buffered ring hides I/O latency behind compute so a <em>streamed</em> layer feels almost as cheap as a resident one. It is one of the three interchangeable backends inside the <a href="streaming-loader.html">streaming loader</a>; all three produce bit-identical output.</p></div>
+<h2 id="problem">Problem</h2>
+<p>Streaming reads each layer from disk on the critical path: <code>loadLayer(L)</code> blocks on <code>pread</code> + dequant before block <code>L</code> can run. Serially, decode is <code>Σ (I/O_L + compute_L)</code>. But the sequence is perfectly predictable — after block <code>L</code> comes block <code>L+1</code>, always — so the I/O for <code>L+1</code> can happen <em>while</em> the compute thread is busy with <code>L</code>. If the pipeline keeps up, the compute thread never waits on storage and per-token time drops toward <code>Σ compute_L</code>.</p>
+<h2 id="design">Design</h2>
+<p><code>LayerLoader</code> runs an optional background worker plus a small ring of slot buffers (<code>Options::n_buffers</code>, default 2). The worker is spawned only when it can help — <code>async &amp;&amp; n_buffers &gt; 1 &amp;&amp; n_pinned_ &lt; n_layers_</code> (<code>src/loader.cpp:154</code>).</p>
+<pre><code class="language-text">      compute thread                     prefetch worker (background)
+      --------------                     ----------------------------
+loadLayer(L)  ---- enqueue(L+1) -------&gt; worker_loop: pread block L+1
+block(L): attn + FFN                     dequant / stage into the other slot
+loadLayer(L+1) -- slot Ready? ---------&gt; HIT  (no wait)  -&gt; prefetch_hits++
+                 not finished? --------&gt; MISS (block on cv_ready_) -&gt; prefetch_misses++</code></pre>
+<h3 id="the-worker-loop">The worker loop</h3>
+<p><code>worker_loop()</code> (<code>src/loader.cpp:295</code>) waits on <code>cv_job_</code> for a <code>Job{slot, layer}</code>, marks the slot <code>Loading</code> under <code>mutex_</code>, then runs <code>fill_slot</code> (I/O + dequant) <strong>unlocked</strong> so it overlaps compute. When done it flips the slot to <code>Ready</code> under the lock and notifies <code>cv_ready_</code>. <code>enqueue()</code> (<code>src/loader.cpp:317</code>) is called with <code>mutex_</code> held and de-dups jobs already queued or in flight.</p>
+<h3 id="one-loadlayer-step">One <code>loadLayer</code> step</h3>
+<p><code>loadLayer(L)</code> (<code>src/loader.cpp:326</code>) in the async path:</p>
+<ol><li>If some slot already holds <code>L</code> and is <code>Ready</code> → <strong>hit</strong>; if it is still <code>Loading</code> → <strong>miss</strong>, wait on <code>cv_ready_</code>.</li><li>If no slot holds <code>L</code> → <strong>miss</strong>: pick a victim slot (not <code>current_</code>), push the job to the <em>front</em> of the queue (priority), and wait until that slot is <code>Ready</code> (<code>src/loader.cpp:371</code>).</li><li>On becoming ready, set <code>current_</code>/<code>active_</code>, then <strong>kick off prefetch of <code>L+1</code></strong> into the other slot (<code>src/loader.cpp:378</code>) so it materializes during the next compute.</li></ol>
+<p>The <code>Stats</code> counters <code>prefetch_hits</code> / <code>prefetch_misses</code> surface how well the pipeline keeps up; they flow out through <a href="runtime.html"><code>GenStats</code></a> for the profiler.</p>
+<h2 id="three-interchangeable-backends">Three interchangeable backends</h2>
+<p>The math only ever sees a <code>WeightSource</code>, so residency strategy is swappable with <strong>no change to output</strong>:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Backend</th><th class="a-left">Flag</th><th class="a-left">Resident weight buffers</th><th class="a-left">Notes</th></tr></thead><tbody><tr><td class="a-left">Synchronous single-buffer <code>pread</code></td><td class="a-left"><code>--no-async</code> (<code>n_buffers = 1</code>)</td><td class="a-left">exactly one layer</td><td class="a-left">strict minimum RAM, fully serial I/O + compute</td></tr><tr><td class="a-left">Async double-buffered ring</td><td class="a-left">default (<code>n_buffers = 2</code>)</td><td class="a-left">up to two layers</td><td class="a-left">worker overlaps <code>L+1</code> load with <code>L</code> compute</td></tr><tr><td class="a-left"><code>mmap</code></td><td class="a-left"><code>--mmap</code></td><td class="a-left">one layer (copied from mapped pages)</td><td class="a-left">OS page cache does the buffering</td></tr></tbody></table></div>
+<p>All three are benchmarked side by side and yield identical logits (guarded by the e2e suite). Choosing among them is a memory/throughput decision, never a correctness one.</p>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Approach</th><th class="a-left">Why not the default</th></tr></thead><tbody><tr><td class="a-left">Deeper pipeline (<code>n_buffers &gt; 2</code>)</td><td class="a-left">Marginal for a strictly sequential access pattern; each extra buffer costs a full layer of RAM. Kept as a knob, not a default.</td></tr><tr><td class="a-left"><code>posix_fadvise</code>/<code>madvise(WILLNEED)</code> readahead</td><td class="a-left"><code>FileBacking::prefetch()</code> exists but is <strong>unused</strong> — the explicit worker already overlaps I/O, and hint-based readahead gave no measured win.</td></tr><tr><td class="a-left">Let <code>mmap</code> + the kernel prefetch everything</td><td class="a-left">No hard RSS ceiling; the OS may fault the whole model in. mmap is offered as a <em>backend</em>, paired with the <a href="memory-planner.html">memory planner</a>&#x27;s budget.</td></tr><tr><td class="a-left">Speculative multi-layer prefetch</td><td class="a-left">Only helps in the exceeds-RAM regime; noted as future throughput work.</td></tr></tbody></table></div>
+<h2 id="tradeoffs">Tradeoffs</h2>
+<ul><li><strong>The async ring costs a second layer buffer.</strong> That is the price of overlap; the single-buffer path exists for the strict-minimum-RAM case, and the <a href="memory-planner.html">memory planner</a> drops the ring to 1 buffer when the budget is tight.</li><li><strong><code>mmap</code> is not zero-copy.</strong> <code>read_raw_at</code> <strong>memcpys</strong> from the mapped pages into a resident buffer (<code>include/llm/file_backing.h</code>); the win is OS page-cache buffering, not a copy elided. See <a href="why-not-mmap.html">Why not mmap?</a>.</li><li><strong><code>FileBacking::prefetch()</code> (fadvise/madvise) is dead code</strong> — present in <code>file_backing.h</code> but never called. The overlap comes entirely from the worker thread, not kernel hints.</li><li><strong>Misses are self-correcting.</strong> A miss pushes the needed layer to the front of the queue and blocks only until it is ready; the pipeline resynchronizes on the next layer.</li></ul>
+<h2 id="source-files">Source files</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">File</th><th class="a-left">Role</th></tr></thead><tbody><tr><td class="a-left"><code>include/llm/loader.h</code></td><td class="a-left">ring/worker state: <code>slots_</code>, <code>Job</code>, <code>cv_job_</code>/<code>cv_ready_</code>, <code>Stats</code> hit/miss counters, <code>Options::n_buffers</code>/<code>async</code>/<code>use_mmap</code></td></tr><tr><td class="a-left"><code>src/loader.cpp</code></td><td class="a-left"><code>worker_loop</code> (295), <code>enqueue</code> (317), <code>loadLayer</code> hit/miss + next-layer prefetch (326), the spawn guard (154)</td></tr><tr><td class="a-left"><code>include/llm/file_backing.h</code></td><td class="a-left"><code>pread_exact</code>, optional <code>mmap</code> view, and the unused <code>prefetch()</code> hint</td></tr><tr><td class="a-left"><code>src/transformer.cpp</code></td><td class="a-left">the forward pass whose per-layer compute the worker overlaps</td></tr></tbody></table></div>
+<h2 id="future-work">Future work</h2>
+<ul><li><strong>Deeper prefetch pipelining</strong> and wiring up <code>posix_fadvise</code>/<code>madvise(WILLNEED)</code> (<code>FileBacking::prefetch()</code> is ready but unused).</li><li><strong>Speculative streaming</strong> to amortize weight movement in the exceeds-RAM regime — the long-term throughput moat.</li><li><strong>True zero-copy mmap</strong> so quantized weights are dotted straight from mapped pages without the intermediate memcpy.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="memory-planner.html"><span>Previous</span>Memory planner</a><a class="pn next" href="runtime.html"><span>Next</span>Runtime</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#problem">Problem</a></li><li class="toc-h2"><a href="#design">Design</a></li><li class="toc-h3"><a href="#the-worker-loop">The worker loop</a></li><li class="toc-h3"><a href="#one-loadlayer-step">One loadLayer step</a></li><li class="toc-h2"><a href="#three-interchangeable-backends">Three interchangeable backends</a></li><li class="toc-h2"><a href="#alternatives-considered">Alternatives considered</a></li><li class="toc-h2"><a href="#tradeoffs">Tradeoffs</a></li><li class="toc-h2"><a href="#source-files">Source files</a></li><li class="toc-h2"><a href="#future-work">Future work</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

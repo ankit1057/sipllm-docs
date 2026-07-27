@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="j-android">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Android inference · SipLLM docs</title>
+<meta name="description" content="**SipLLM was built to run on a phone: standard C++17 and pthread, no BLAS, no ggml, no PyTorch — the runtime that streams a 13 B model in 317 MB on a Mac is …">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html" class="active" aria-current="page">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Engineering journal <span aria-hidden="true">/</span> Android inference</div>
+      <h1>Android inference</h1>
+      <p>**SipLLM was built to run on a phone: standard C++17 and <code>pthread</code>, no BLAS, no ggml, no PyTorch — the runtime that streams a 13 B model in 317 MB on a Mac is the same object code that a Dimensity 8300 compiles under Termux. Wave 8 wraps that engine in a stable C ABI, a per-ABI NDK build, and a Flutter app whose Dart isolate streams tokens to the UI, plus a phone→watch transfer path for a Wear OS budget. But honesty first: Wave 8 is <em>host-verified only</em>. The Android APK, on-device inference, and the Wear transfer have not yet been run on real hardware, and there are no device benchmark numbers — none are invented on this page.**</p>
+<div class="callout warn"><div class="callout-title">Not yet device-verified</div><p>Everything below is verified on the host (macOS / Apple M3): the C ABI, the full Dart → isolate → FFI path, the downloader, and the embedding store all pass. <strong>The on-device APK, phone inference (POCO X6 Pro), and Wear transfer (OnePlus Watch 2) are NOT yet runtime-verified, and device benchmarks are pending.</strong> Any tok/s or peak-RSS figure you see on this site is Apple M3 host data — no phone or watch numbers exist yet.</p></div>
+<h2 id="the-per-abi-ndk-build">The per-ABI NDK build</h2>
+<p>The engine has no Android-specific fork. <code>bindings/flutter/sipllm_flutter/src/CMakeLists.txt</code> globs the <em>shared</em> <code>src/*.cpp</code>, adds the C-ABI shim, and builds <code>libsipllm_ffi</code> once per ABI through the NDK — no runtime code is duplicated. The only per-ABI difference is SIMD tuning:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">ABI</th><th class="a-left">Compile flags</th><th class="a-left">Effect</th></tr></thead><tbody><tr><td class="a-left"><code>arm64-v8a</code></td><td class="a-left"><code>-march=armv8.2-a+dotprod</code></td><td class="a-left">lights up the SDOT kernels in <code>simd.h</code></td></tr><tr><td class="a-left"><code>armeabi-v7a</code></td><td class="a-left"><code>-mfpu=neon-vfpv4</code></td><td class="a-left">NEON, no dot-product</td></tr><tr><td class="a-left"><code>x86_64</code></td><td class="a-left">(baseline)</td><td class="a-left">scalar fallback</td></tr></tbody></table></div>
+<p>The <code>+dotprod</code> on arm64 is the important one: Armv8.2 dot-product is universal on the target SoCs (Dimensity 8300 A715/A510, Snapdragon W5 A53), and it enables the int8 SDOT path.</p>
+<div class="callout warn"><div class="callout-title">SDOT accelerates Q8_0 only</div><p>The <code>--fast</code> int8 SDOT kernel is <strong>Q8_0-only</strong> and ARM-only, and it is an approximation (activation quantized) — the fp32-dequant path stays the correctness oracle. It does <em>not</em> yet accelerate K-quants, so a <code>Q4_K_M</code> model on a phone still decodes through the scalar/NEON fp32 path. Do not expect <code>--fast</code> speedups on 4-bit models.</p></div>
+<p>The same CMake can compile the experimental Vulkan backend, but per the runtime&#x27;s standing caveat that backend is <strong>detection-only</strong>: <code>vulkan_matmul</code> always falls back to CPU. <code>make VULKAN=1</code> (or <code>-DSIPLLM_VULKAN=ON</code>) enables device <em>enumeration</em>, never working GPU offload.</p>
+<h2 id="the-termux-path">The Termux path</h2>
+<p>Android was the original target, and Termux is still the primary one. Because the engine is just C++17 + <code>pthread</code>, it builds and runs on-device with no cross-compilation ceremony — <code>make</code> on the phone produces the same <code>build/llm</code> CLI you get on a laptop. The README&#x27;s own status notes SipLLM was &quot;built and tested on a phone (Termux / Android, Dimensity 8300)&quot;; that CLI path is the most mature Android story. The APK below is the productization layer on top of the same binary.</p>
+<h2 id="the-flutter-apk-dart-isolate">The Flutter APK + Dart isolate</h2>
+<p>The app never blocks the UI thread on inference. <code>SipllmRuntime</code> runs the C++ engine on a <strong>worker isolate</strong>; tokens flow back to the UI isolate over a <code>Stream&lt;SipllmToken&gt;</code>, and generation is cancelled mid-flight by the UI calling <code>sipllm_cancel</code> — a thread-safe atomic the callback checks, so cancellation needs no polling and never stalls the UI. The generation knobs are plumbed through a zero-init <code>SipllmParams</code>:</p>
+<pre><code class="language-text">SipllmParams(
+  ramBudgetBytes,      // 0 = unlimited streaming
+  threads,             // 0 = hardware_concurrency
+  maxCtx,
+  fastQuant,           // Q8_0 SDOT, opt-in
+  streamLmHead,
+  schedulePolicy,      // proportional2 by default
+)</code></pre>
+<p><code>SipllmController</code> (the example app&#x27;s single source of truth) owns model download/import, the loaded runtime, streaming chat, an optional embedding-backed memory, and benchmark capture. On load it also formats conversations with a <code>PromptTemplate</code> (chatml/llama3/zephyr/raw) — because the engine itself applies <strong>no chat template</strong>; inference is over raw text and the app is responsible for the prompt shape.</p>
+<div class="callout note"><div class="callout-title">Dart stats are a subset</div><p>The Dart <code>SipllmStats</code> drops the per-phase seconds (<code>load_s</code>/<code>prefill_s</code>/<code>decode_s</code>) that the C <code>sipllm_stats</code> carries; it keeps TTFT, prefill/decode tok/s, and the byte/count fields. The benchmark harness records device model, ABI, cores, threads, and budget — but no device runs have populated it yet.</p></div>
+<h2 id="the-watch-s-tight-ram-budget">The watch&#x27;s tight RAM budget</h2>
+<p>A watch has far less RAM than a phone, so the controller special-cases it: when <code>ArchDetector</code> reports <code>isWearOs</code>, the app defaults <code>ramBudgetMiB</code> to a tight streaming budget (<code>suggestedRamBudgetBytes</code>) instead of unlimited — exactly the <a href="memory-planner.html"><code>--ram-budget</code></a> dial, turned down hard. Because peak RSS tracks a single layer&#x27;s width, a bounded budget is what makes a watch a plausible target at all.</p>
+<p>Getting a model onto the watch is a <strong>phone → Wear OS transfer</strong> over the Wearable Data Layer <code>ChannelClient</code>: Bluetooth for control, Wi-Fi High-Bandwidth for the bulk bytes, with a resumable header/ack protocol. RFCOMM is deliberately avoided because Wear OS does not expose it. This is the part most in need of hardware validation — see the caveat below.</p>
+<h2 id="status-what-is-and-is-not-proven">Status: what is and is not proven</h2>
+<p>To be unambiguous, because it matters:</p>
+<ul><li><strong>Verified on host (macOS / Apple M3):</strong> C-ABI smoke test (generate + cancel + embed); the full Dart → isolate → FFI path; the resumable Hugging Face downloader (5 tests); the SQLite embedding store (13 tests); engine <code>make test</code> green; <code>flutter analyze</code> clean.</li><li><strong>NOT yet runtime-verified:</strong> the Android APK and on-device inference on the POCO X6 Pro; the Wear transfer on the paired OnePlus Watch 2. These are the remainder of milestone M6.5.</li><li><strong>No device numbers exist.</strong> Every tok/s, TTFT, and peak-RSS figure on this portal is Apple M3 host data. Phone and watch benchmarks are pending; none are fabricated.</li></ul>
+<p>Once the APK runs on device this page graduates from &quot;host-verified&quot; to measured. Until then it is an honest description of code that compiles, links, and passes on the host. For the runtime wrapper details see the <a href="flutter-runtime.html">Flutter runtime</a> chapter, and for the watch transfer protocol see <a href="wear-support.html">Wear OS support</a>.</p>
+      <nav class="page-footer-nav"><a class="pn prev" href="j-peak-rss.html"><span>Previous</span>Why peak RSS matters</a><a class="pn next" href="design-decisions.html"><span>Next</span>Design decisions</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#the-per-abi-ndk-build">The per-ABI NDK build</a></li><li class="toc-h2"><a href="#the-termux-path">The Termux path</a></li><li class="toc-h2"><a href="#the-flutter-apk-dart-isolate">The Flutter APK + Dart isolate</a></li><li class="toc-h2"><a href="#the-watch-s-tight-ram-budget">The watch&amp;#x27;s tight RAM budget</a></li><li class="toc-h2"><a href="#status-what-is-and-is-not-proven">Status: what is and is not proven</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="api-dart">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dart / Flutter reference · SipLLM docs</title>
+<meta name="description" content="package:sipllm_flutter binds the streaming engine to Flutter through the C ABI, and adds the surrounding machinery a mobile app needs: a resumable Hugging Fa…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html" class="active" aria-current="page">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">API reference <span aria-hidden="true">/</span> Dart / Flutter</div>
+      <h1>Dart / Flutter reference</h1>
+      <p><code>package:sipllm_flutter</code> binds the streaming engine to Flutter through the <a href="api-c.html">C ABI</a>, and adds the surrounding machinery a mobile app needs: a resumable Hugging Face downloader, an on-device SQLite embedding store, device/arch detection, and phone&harr;Wear OS model transfer. The inference runtime is isolate-backed — one <code>SipllmRuntime</code> owns one worker isolate holding one native context. This page reproduces the public surface verbatim from <code>lib/src/**</code>.</p>
+<div class="callout note"><div class="callout-title">Reference</div><p>Signatures are copied from source. Types that cross the isolate/MethodChannel boundary are plain values (no pointers). The runtime wraps the <a href="api-c.html">C ABI</a> one-to-one; see <a href="flutter-runtime.html">Flutter runtime</a> for the isolate architecture and <a href="wear-support.html">Wear support</a> for the transfer bridge.</p></div>
+<h2 id="inference-runtime">Inference runtime</h2>
+<h3 id="sipllmruntime"><code>SipllmRuntime</code></h3>
+<p>A loaded model driven from a background isolate. Exposes streaming generation, cancellation, embeddings, and per-run stats.</p>
+<pre><code class="language-dart">static Future&lt;SipllmRuntime&gt; open(
+  String modelPath, {
+  SipllmParams params = const SipllmParams(),
+  String? libraryPath,
+  int logLevel = 1,
+});                                        // open a GGUF/.llmw model on a worker isolate
+
+Stream&lt;SipllmToken&gt; generate(
+  String prompt, {
+  int maxNew = 256,
+  SipllmSampler sampler = const SipllmSampler(),
+});                                        // stream pieces; populates lastStats on completion
+
+Future&lt;String&gt; complete(
+  String prompt, {
+  int maxNew = 256,
+  SipllmSampler sampler = const SipllmSampler(),
+});                                        // collect the full completion as one string
+
+void cancel();                             // stop the in-flight generation (thread-safe)
+
+Future&lt;Float32List&gt; embed(
+  String text, {
+  Pooling pooling = Pooling.last,
+});                                        // L2-normalized embedding for `text`
+
+void reset();                              // clear KV cache / conversation state
+Future&lt;void&gt; close();                      // free native context, shut down the isolate
+
+final SipllmModelInfo modelInfo;           // static description of the loaded model
+final int threads;                         // worker thread count the engine spun up
+SipllmStats? get lastStats;                // metrics from the most recent generation
+bool get isBusy;                           // a generation/embed is in flight</code></pre>
+<div class="callout warn"><div class="callout-title">`embed()` clears KV state</div><p>Like the C ABI&#x27;s <code>sipllm_embed</code>, <code>embed()</code> clears the KV cache. Use a dedicated <code>SipllmRuntime</code> for embeddings, not one mid-conversation. <code>generate()</code> and <code>embed()</code> also throw / error if the runtime <code>isBusy</code> — a runtime is single-context.</p></div>
+<p><code>cancel()</code> is the one method safe to call while the worker is mid-<code>generate()</code>: <code>SipllmRuntime.open</code> loads its own native handle in the main isolate so it can invoke the thread-safe native <code>sipllm_cancel</code> on the shared context (<code>bindings/flutter/sipllm_flutter/lib/src/runtime/sipllm_runtime.dart</code>).</p>
+<h3 id="sipllmparams"><code>SipllmParams</code></h3>
+<p>Open-time configuration. Zero-arg construction mirrors the engine defaults (streaming, quantized residency, hardware threads).</p>
+<pre><code class="language-dart">const SipllmParams({
+  this.ramBudgetBytes = 0,
+  this.threads = 0,
+  this.maxCtx = 0,
+  this.nBuffers = 2,
+  this.useMmap = false,
+  this.asyncPrefetch = true,
+  this.fastQuant = false,
+  this.streamLmHead = false,
+  this.residencyFp32 = false,
+  this.forceBudget = false,
+  this.schedulePolicy = SchedulePolicy.proportional2,
+});
+
+final int ramBudgetBytes;                  // hard peak-RSS ceiling (--ram-budget); 0 = unlimited
+final int threads;                         // &gt;0 fixed; 0 = hw concurrency; -1 = auto-tune + cache
+final int maxCtx;
+final int nBuffers;
+final bool useMmap;
+final bool asyncPrefetch;
+final bool fastQuant;                      // opt-in int8 SDOT kernel for Q8_0 (--fast)
+final bool streamLmHead;
+final bool residencyFp32;
+final bool forceBudget;
+final SchedulePolicy schedulePolicy;
+
+SipllmParams copyWithBudgetMiB(int mib);   // convenience: budget in MiB
+SipllmParams copyWith({ /* per-field overrides */ });</code></pre>
+<h3 id="sipllmsampler"><code>SipllmSampler</code></h3>
+<p>Token sampling. <code>temperature &lt;= 0</code> selects greedy decoding.</p>
+<pre><code class="language-dart">const SipllmSampler({
+  this.temperature = 0.8,
+  this.topK = 40,
+  this.topP = 0.95,
+  this.repeatPenalty = 1.1,
+  this.repeatLastN = 64,
+  this.seed = 0x2545F4914F6CDD1D,
+});
+
+const SipllmSampler.greedy();              // temperature 0, topK 0, topP 1.0
+
+final double temperature;
+final int topK;
+final double topP;
+final double repeatPenalty;
+final int repeatLastN;
+final int seed;</code></pre>
+<h3 id="sipllmmodelinfo"><code>SipllmModelInfo</code></h3>
+<p>Static description of a loaded model (returned as <code>SipllmRuntime.modelInfo</code>).</p>
+<pre><code class="language-dart">const SipllmModelInfo({
+  required this.arch,
+  required this.nLayers,
+  required this.nHeads,
+  required this.nKvHeads,
+  required this.dim,
+  required this.vocabSize,
+  required this.ctxLen,
+  required this.tokenizerKind,
+});
+
+final String arch;
+final int nLayers;
+final int nHeads;
+final int nKvHeads;
+final int dim;
+final int vocabSize;
+final int ctxLen;
+final TokenizerKind tokenizerKind;</code></pre>
+<h3 id="sipllmstats"><code>SipllmStats</code></h3>
+<p>Per-generation metrics — the numbers the SipLLM dashboard displays.</p>
+<pre><code class="language-dart">const SipllmStats({
+  required this.ttftSeconds,
+  required this.prefillTokensPerSecond,
+  required this.decodeTokensPerSecond,
+  required this.peakRssBytes,
+  required this.weightsResidentBytes,
+  required this.kvBytes,
+  required this.bytesRead,
+  required this.prefetchHits,
+  required this.prefetchMisses,
+  required this.pinnedLayers,
+  required this.nLayers,
+  required this.promptTokens,
+  required this.genTokens,
+  required this.ctxUsed,
+  required this.ctxMax,
+});
+
+final double ttftSeconds;
+final double prefillTokensPerSecond;
+final double decodeTokensPerSecond;
+final int peakRssBytes;
+final int weightsResidentBytes;
+final int kvBytes;
+final int bytesRead;
+final int prefetchHits;
+final int prefetchMisses;
+final int pinnedLayers;
+final int nLayers;
+final int promptTokens;
+final int genTokens;
+final int ctxUsed;
+final int ctxMax;
+
+double get peakRssMiB;</code></pre>
+<div class="callout note"><div class="callout-title">Dart stats are a subset</div><p><code>SipllmStats</code> is a <em>subset</em> of the C <a href="api-c.html#sipllm-stats-per-generation-metrics"><code>sipllm_stats</code></a>: it drops <code>load_s</code> / <code>prefill_s</code> / <code>decode_s</code> (the per-phase seconds). It keeps TTFT, prefill/decode tok/s, and every byte/count field.</p></div>
+<h3 id="sipllmtoken"><code>SipllmToken</code></h3>
+<p>Emitted for each streamed piece during generation.</p>
+<pre><code class="language-dart">const SipllmToken(this.piece, this.id);
+final String piece;
+final int id;</code></pre>
+<h3 id="runtime-enums">Runtime enums</h3>
+<pre><code class="language-dart">enum SchedulePolicy {
+  static$(kSchedStatic), fixed8(kSchedFixed8), fixed16(kSchedFixed16),
+  fixed32(kSchedFixed32), proportional2(kSchedProportional2),
+  proportional4(kSchedProportional4), adaptive(kSchedAdaptive);
+  final int code;
+}                                          // proportional2 is the engine default
+
+enum Pooling { last(kPoolLast), mean(kPoolMean); final int code; }
+enum TokenizerKind { sentencePiece, bpe, byte }</code></pre>
+<h2 id="device-architecture">Device / architecture</h2>
+<h3 id="sipllmdevice"><code>SipllmDevice</code></h3>
+<p>Static engine + accelerator capabilities that need no model. <code>SipllmDevice.load({String? libraryPath})</code>.</p>
+<pre><code class="language-dart">String get engineVersion;                  // native version string
+int get hardwareConcurrency;               // logical CPU count
+bool get vulkanCompiled;                    // built with Vulkan backend
+bool get vulkanAvailable;                   // usable Vulkan device found at runtime
+String get vulkanInfo;                      // device name / fallback reason
+int optimalThreads(String modelPath, {int ramBudgetBytes = 0});  // benchmark + cache profile
+void setLogLevel(int level);</code></pre>
+<div class="callout warn"><div class="callout-title">Vulkan is detection-only</div><p><code>vulkanAvailable</code> may be true, but the compute path is stubbed and always falls back to CPU. Never treat it as working GPU acceleration.</p></div>
+<h3 id="archdetector-deviceprofile-cpuarch"><code>ArchDetector</code>, <code>DeviceProfile</code>, <code>CpuArch</code></h3>
+<p>Device/ABI profile + Wear OS detection.</p>
+<pre><code class="language-dart">class ArchDetector {
+  ArchDetector([MethodChannel? channel]);
+  Future&lt;DeviceProfile&gt; detect();          // native on Android; inferred from dart:io elsewhere
+}
+
+enum CpuArch {
+  arm64(&#x27;arm64-v8a&#x27;, true), arm32(&#x27;armeabi-v7a&#x27;, false),
+  x64(&#x27;x86_64&#x27;, true), x86(&#x27;x86&#x27;, false), unknown(&#x27;unknown&#x27;, false);
+  final String androidAbi;
+  final bool is64Bit;
+  static CpuArch fromAbi(String abi);
+}
+
+class DeviceProfile {
+  const DeviceProfile({
+    required this.primaryArch, required this.supportedAbis, required this.isWearOs,
+    required this.cores, required this.model, required this.androidSdkInt,
+  });
+  final CpuArch primaryArch;
+  final List&lt;CpuArch&gt; supportedAbis;
+  final bool isWearOs;
+  final int cores;
+  final String model;
+  final int androidSdkInt;
+  bool get is64Bit;
+  int get suggestedRamBudgetBytes;         // conservative default per device class
+  Map&lt;String, Object&gt; toMap();
+}</code></pre>
+<h2 id="hugging-face-download-manager">Hugging Face download manager</h2>
+<p>A resumable, multi-connection downloader on <code>dart:io</code> <code>HttpClient</code> alone (no Flutter), so it is host-VM unit-testable.</p>
+<h3 id="huggingfacerepo"><code>HuggingFaceRepo</code></h3>
+<pre><code class="language-dart">const HuggingFaceRepo(this.repo, {this.revision = &#x27;main&#x27;});
+final String repo;                         // &quot;&lt;owner&gt;/&lt;name&gt;&quot;
+final String revision;                     // branch, tag, or commit sha
+String resolveUrl(String filename);        // https://huggingface.co/&lt;repo&gt;/resolve/&lt;rev&gt;/&lt;file&gt;</code></pre>
+<h3 id="downloadmanager"><code>DownloadManager</code></h3>
+<p>Owns a shared <code>HttpClient</code> and a global connection budget, and mints <code>DownloadTask</code>s. The <code>maxConnections</code> cap is enforced across <em>all</em> tasks.</p>
+<pre><code class="language-dart">DownloadManager({int maxConnections = 4});
+
+List&lt;DownloadTask&gt; get tasks;              // all tasks ever enqueued, newest last
+
+DownloadTask enqueue({
+  required String url,
+  required String destPath,
+  int? expectedSize,
+  String? sha256,
+  int? connections,
+  Map&lt;String, String&gt;? headers,
+});                                        // create + start a download; resumes from a sidecar
+
+Future&lt;void&gt; disposeAll();                 // pause every task, flush offsets, close the client</code></pre>
+<h3 id="downloadtask"><code>DownloadTask</code></h3>
+<p>A single resumable download.</p>
+<div class="callout warn"><div class="callout-title">Do not construct directly</div><p>The <code>DownloadTask</code> constructor is <code>@internal</code>. Mint tasks via <code>DownloadManager.enqueue</code>; observe <code>progress</code>, await <code>done</code>, and steer with <code>pause</code>/<code>resume</code>/<code>cancel</code>.</p></div>
+<pre><code class="language-dart">final String url;
+final String destPath;                     // final assembled output path
+final int? expectedSize;                   // verified after assembly
+final String? sha256Hex;                   // lowercase-hex sha256, verified after assembly
+
+Stream&lt;DownloadProgress&gt; get progress;     // throttled (~4/sec) samples; terminal sample before done
+Future&lt;void&gt; get done;                     // completes on completed/canceled; errors on failed
+DownloadState get state;
+Future&lt;void&gt; get settled;                  // resolves when the current run cycle unwinds
+
+void start();                              // kick off the first run (no-op past queued)
+void pause();                              // stop in-flight connections, flush offsets
+Future&lt;void&gt; resume();                     // restart a paused/failed task from committed offsets
+void cancel();                             // abort and delete every part file + sidecar</code></pre>
+<h3 id="downloadprogress"><code>DownloadProgress</code></h3>
+<pre><code class="language-dart">const DownloadProgress({
+  required this.received,
+  required this.total,
+  required this.bytesPerSecond,
+  required this.activeConnections,
+});
+final int received;                        // bytes committed to disk across every segment
+final int? total;                          // null when the server never disclosed a length
+final double bytesPerSecond;               // ~2s moving-average throughput
+final int activeConnections;
+double? get fraction;                      // completion in [0,1], or null when total unknown</code></pre>
+<h3 id="downloadstate"><code>DownloadState</code></h3>
+<pre><code class="language-dart">enum DownloadState { queued, running, paused, completed, failed, canceled }
+// completed/failed/canceled are terminal; paused is a resting state resume() revives.</code></pre>
+<h2 id="on-device-embeddings">On-device embeddings</h2>
+<p>A local SQLite-backed vector store (<code>package:sqlite3</code>), host-VM testable. Engine embeddings are L2-normalized, so cosine similarity is a dot product; search is a full linear scan.</p>
+<h3 id="embeddingstore"><code>EmbeddingStore</code></h3>
+<pre><code class="language-dart">static EmbeddingStore open(String path, {required int dim});   // file-backed; dim must match
+static EmbeddingStore inMemory({required int dim});            // private, ephemeral
+
+final int dim;                             // fixed vector dimensionality
+int get length;                            // number of embeddings stored
+
+int add({
+  required String text,
+  required Float32List embedding,
+  Map&lt;String, Object?&gt;? metadata,
+});                                        // insert one; returns row id
+
+void addBatch(List&lt;EmbeddingRecord&gt; records);   // insert many in one transaction
+
+List&lt;EmbeddingMatch&gt; search(
+  Float32List query, {
+  int topK = 5,
+  bool Function(Map&lt;String, Object?&gt;? meta)? where,
+});                                        // top-K by descending cosine similarity
+
+EmbeddingRecord? get(int id);              // null if absent
+void delete(int id);                       // no-op if absent
+void clear();                              // remove all, keep dim
+void close();                              // dispose the database</code></pre>
+<h3 id="embeddingrecord-embeddingmatch"><code>EmbeddingRecord</code>, <code>EmbeddingMatch</code></h3>
+<pre><code class="language-dart">const EmbeddingRecord({
+  required this.text,
+  required this.embedding,                 // length must equal store dim; expected L2-normalized
+  this.metadata,                           // JSON-encodable
+});
+final String text;
+final Float32List embedding;
+final Map&lt;String, Object?&gt;? metadata;
+
+const EmbeddingMatch({
+  required this.id,
+  required this.text,
+  required this.score,                     // cosine similarity in [-1, 1]; higher is closer
+  this.metadata,
+});
+final int id;
+final String text;
+final double score;
+final Map&lt;String, Object?&gt;? metadata;</code></pre>
+<h2 id="phone-wear-os-transfer">Phone &harr; Wear OS transfer</h2>
+<p>Copies a model file between a paired phone and watch over the Wearable Data Layer <code>ChannelClient</code>. See <a href="wear-support.html">Wear support</a>.</p>
+<h3 id="weartransfer"><code>WearTransfer</code></h3>
+<p>One transfer at a time (the Android bridge is single-slot).</p>
+<pre><code class="language-dart">WearTransfer({MethodChannel? methodChannel, EventChannel? eventChannel});
+
+Future&lt;List&lt;WearNode&gt;&gt; connectedNodes();   // reachable Data Layer nodes (empty if unpaired)
+Stream&lt;TransferProgress&gt; events();          // broadcast send + receive progress
+Future&lt;void&gt; sendModel(String path, {String? nodeId, bool resume = true});  // start a send
+Future&lt;void&gt; listenIncoming();              // watch side: accept an incoming channel (idempotent)
+Future&lt;void&gt; pause();                       // close the channel, retain offsets
+Future&lt;void&gt; resume();                      // reopen + re-negotiate the resume offset
+Future&lt;void&gt; cancel();                      // abort, discard partial file</code></pre>
+<h3 id="wearnode"><code>WearNode</code></h3>
+<pre><code class="language-dart">const WearNode({required this.id, required this.displayName, required this.nearby});
+final String id;                            // opaque Data Layer node id
+final String displayName;
+final bool nearby;                          // Data Layer reachability signal
+factory WearNode.fromMap(Map&lt;Object?, Object?&gt; m);</code></pre>
+<h3 id="transferprogress"><code>TransferProgress</code></h3>
+<pre><code class="language-dart">const TransferProgress({
+  required this.direction,
+  required this.nodeId,
+  required this.filename,
+  required this.sent,
+  required this.total,
+  required this.bytesPerSecond,
+  required this.state,
+});
+final TransferDirection direction;
+final String? nodeId;                       // null before a node is resolved
+final String filename;                      // model file basename
+final int sent;                             // bytes transferred so far
+final int? total;                           // null until known
+final double bytesPerSecond;                // 0 while connecting
+final TransferState state;
+double? get fraction;                       // [0,1], or null when total unknown
+bool get isTerminal;                        // completed/failed/canceled
+factory TransferProgress.fromMap(Map&lt;Object?, Object?&gt; m);</code></pre>
+<h3 id="transferdirection-transferstate"><code>TransferDirection</code>, <code>TransferState</code></h3>
+<pre><code class="language-dart">enum TransferDirection {
+  send, receive;
+  static TransferDirection fromWire(String? s);   // defaults to send on unknown
+}
+
+enum TransferState {
+  idle, connecting, transferring, paused, completed, failed, canceled;
+  static TransferState fromWire(String? s);       // defaults to idle on unknown
+}</code></pre>
+<h2 id="see-also">See also</h2>
+<ul><li><a href="api-c.html">C ABI reference</a> — the native surface this package binds.</li><li><a href="flutter-runtime.html">Flutter runtime</a> — the isolate + FFI architecture.</li><li><a href="wear-support.html">Wear support</a> — the Data Layer transfer design.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="api-cpp.html"><span>Previous</span>C++ engine</a><a class="pn next" href="journal.html"><span>Next</span>Overview</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#inference-runtime">Inference runtime</a></li><li class="toc-h3"><a href="#sipllmruntime">SipllmRuntime</a></li><li class="toc-h3"><a href="#sipllmparams">SipllmParams</a></li><li class="toc-h3"><a href="#sipllmsampler">SipllmSampler</a></li><li class="toc-h3"><a href="#sipllmmodelinfo">SipllmModelInfo</a></li><li class="toc-h3"><a href="#sipllmstats">SipllmStats</a></li><li class="toc-h3"><a href="#sipllmtoken">SipllmToken</a></li><li class="toc-h3"><a href="#runtime-enums">Runtime enums</a></li><li class="toc-h2"><a href="#device-architecture">Device / architecture</a></li><li class="toc-h3"><a href="#sipllmdevice">SipllmDevice</a></li><li class="toc-h3"><a href="#archdetector-deviceprofile-cpuarch">ArchDetector, DeviceProfile, CpuArch</a></li><li class="toc-h2"><a href="#hugging-face-download-manager">Hugging Face download manager</a></li><li class="toc-h3"><a href="#huggingfacerepo">HuggingFaceRepo</a></li><li class="toc-h3"><a href="#downloadmanager">DownloadManager</a></li><li class="toc-h3"><a href="#downloadtask">DownloadTask</a></li><li class="toc-h3"><a href="#downloadprogress">DownloadProgress</a></li><li class="toc-h3"><a href="#downloadstate">DownloadState</a></li><li class="toc-h2"><a href="#on-device-embeddings">On-device embeddings</a></li><li class="toc-h3"><a href="#embeddingstore">EmbeddingStore</a></li><li class="toc-h3"><a href="#embeddingrecord-embeddingmatch">EmbeddingRecord, EmbeddingMatch</a></li><li class="toc-h2"><a href="#phone-wear-os-transfer">Phone &amp;harr; Wear OS transfer</a></li><li class="toc-h3"><a href="#weartransfer">WearTransfer</a></li><li class="toc-h3"><a href="#wearnode">WearNode</a></li><li class="toc-h3"><a href="#transferprogress">TransferProgress</a></li><li class="toc-h3"><a href="#transferdirection-transferstate">TransferDirection, TransferState</a></li><li class="toc-h2"><a href="#see-also">See also</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

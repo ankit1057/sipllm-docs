@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="runtime">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runtime — end-to-end generation · SipLLM docs</title>
+<meta name="description" content="Problem → Design → Alternatives → Tradeoffs → Source → Future. Runtime owns the whole stack and drives one prompt to a stream of tokens. It is where the memo…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html" class="active" aria-current="page">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Architecture <span aria-hidden="true">/</span> Runtime</div>
+      <h1>Runtime — end-to-end generation</h1>
+      <div class="callout note"><div class="callout-title">Architecture book</div><p><strong>Problem → Design → Alternatives → Tradeoffs → Source → Future.</strong> <code>Runtime</code> owns the whole stack and drives one prompt to a stream of tokens. It is where the <a href="memory-planner.html">memory planner</a>, the <a href="streaming-loader.html">streaming loader</a>, the <a href="kv-cache.html">KV cache</a>, and the <a href="transformer.html">transformer</a> are assembled and run.</p></div>
+<h2 id="problem">Problem</h2>
+<p>The layers below are deliberately narrow: the loader only knows about weights, the transformer only about a forward pass, the planner only about bytes. Something has to open a model file of unknown format, turn a byte budget into concrete loader options, wire the stack together in the right order, and run the prefill→decode loop while collecting the throughput/latency numbers the UI shows. That is <code>Runtime</code>.</p>
+<h2 id="design">Design</h2>
+<h3 id="opening-a-model">Opening a model</h3>
+<p><code>open_model(path, use_mmap)</code> (<code>src/runtime.cpp:13</code>) sniffs the first four bytes: <code>kGGUFMagic</code> → <code>GgufFile</code> (the real GGUF parser), <code>kLLMWMagic</code> → <code>ModelFile</code> (the toy <code>.llmw</code> format), anything else throws. Both implement <code>WeightSource</code>, so nothing above cares which was opened.</p>
+<h3 id="construction-plan-then-build">Construction — plan, then build</h3>
+<p>The constructor (<code>src/runtime.cpp:32</code>) runs a fixed sequence:</p>
+<ol><li><code>ModelConfig::from_source</code> reads hyperparameters; <code>set_fast_quant</code> opts into the int8 SDOT kernel when <code>--fast</code> is set.</li><li>Build a <code>BudgetRequest</code> from the options + <code>ram_budget_total</code> and call <code>plan_memory</code> (<a href="memory-planner.html">memory planner</a>).</li><li>If a budget was given, print <code>plan.report</code>; <strong>throw</strong> on an infeasible plan unless <code>--ram-budget-force</code> was passed (<code>src/runtime.cpp:52</code>).</li><li>Apply the plan: <code>ctx = plan.ctx</code>, <code>opt_.stream_lm_head</code>, <code>opt_.n_buffers</code>, and <code>opt_.ram_budget_bytes = plan.weight_ceiling</code>.</li><li>Build the stack in dependency order: <code>ThreadPool</code> → <code>LayerLoader</code> → <code>KVCache(n_layers, kv_dim, ctx)</code> → <code>Transformer</code> → <code>Tokenizer</code>.</li></ol>
+<pre><code class="language-text">open_model(path)            magic-sniff GGUF vs .llmw -&gt; WeightSource
+  └─ plan_memory(req)       budget -&gt; ctx / head / buffers / weight_ceiling
+       └─ ThreadPool        auto-tuned threads (see auto-tuning)
+            └─ LayerLoader   residency + prefetch, capped at weight_ceiling
+                 └─ KVCache  sized to the chosen ctx
+                      └─ Transformer  forward pass over the loader + KV</code></pre>
+<h3 id="generation-one-prefill-then-a-decode-loop">Generation — one prefill, then a decode loop</h3>
+<p><code>generate()</code> (<code>src/runtime.cpp:72</code>) encodes the prompt (adding BOS only on a fresh sequence — the engine applies <strong>no chat template</strong>; the caller formats conversations), then:</p>
+<ul><li><strong>Prefill (single pass).</strong> <code>tf_-&gt;prefill(ids, n, pos_)</code> streams the whole model <strong>once</strong> for the entire prompt (RFC-007), instead of the old per-token loop that re-streamed every layer for every prompt token. It advances <code>pos_</code>, seeds the sampler&#x27;s repetition history, records <code>first_logits_</code>, and samples the first token. <code>ttft_s = prefill_s</code>.</li><li><strong>Decode loop.</strong> For each new token: stop on EOG or ctx exhaustion, decode the piece, invoke the <code>on_token</code> callback (return <code>false</code> to stop early), then <code>tf_-&gt;forward(next, pos_)</code> for the next logits and sample. An optional <code>ProfileSink</code> reports per-layer timings + peak RSS per step.</li></ul>
+<p>Finally it fills <code>GenStats</code> — <code>prompt/gen_tokens</code>, <code>ttft_s</code>, <code>prefill_tok_s</code>, <code>decode_tok_s</code>, <code>weights_resident_bytes</code>, <code>pinned_layers</code>, <code>kv_bytes</code>, <code>bytes_read</code>, <code>prefetch_hits</code>/<code>misses</code>, <code>ctx_used</code>/<code>ctx_max</code>.</p>
+<h2 id="measured">Measured</h2>
+<p>Single-pass prefill is why time-to-first-token is bounded even for long prompts — the model is streamed once, not once per prompt token:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Workload</th><th class="a-left">Metric</th><th class="a-right">Before</th><th class="a-right">After</th></tr></thead><tbody><tr><td class="a-left">smollm2, 122-tok prompt</td><td class="a-left">streamed</td><td class="a-right">14,456 MB</td><td class="a-right">790 MB (18.3×)</td></tr><tr><td class="a-left">smollm2, 122-tok prompt</td><td class="a-left">TTFT</td><td class="a-right">3.44 s</td><td class="a-right">1.96 s</td></tr><tr><td class="a-left">tinyllama, 50-tok prompt</td><td class="a-left">streamed</td><td class="a-right">31,128 MB</td><td class="a-right">2,882 MB (10.8×)</td></tr></tbody></table></div>
+<p>The KV cache the runtime sizes to <code>ctx</code> grows on demand, so peak RSS tracks real conversation length, not the reservation:</p>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Model</th><th class="a-right">Peak RSS before</th><th class="a-right">after</th><th class="a-right">KV before</th><th class="a-right">KV after</th></tr></thead><tbody><tr><td class="a-left">SmolLM2-135M</td><td class="a-right">239 MB</td><td class="a-right">53.5 MB</td><td class="a-right">188.7 MB</td><td class="a-right">2.9 MB</td></tr><tr><td class="a-left">TinyLlama-1.1B Q4_K_M</td><td class="a-right">210.6 MB</td><td class="a-right">121 MB</td><td class="a-right">92.3 MB</td><td class="a-right">2.9 MB</td></tr></tbody></table></div>
+<p><em>(M3, warm, t=4.)</em></p>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Approach</th><th class="a-left">Why not</th></tr></thead><tbody><tr><td class="a-left">Per-token prefill loop (the old way)</td><td class="a-left">Re-streamed the whole model for every prompt token — TTFT and bytes-streamed scaled with prompt length. Single-pass prefill collapses it to one stream.</td></tr><tr><td class="a-left">Apply a built-in chat template</td><td class="a-left">The engine stays raw-text; conversation formatting is the caller&#x27;s job (<a href="flutter-runtime.html">Flutter runtime</a> does chatml/llama3/zephyr/raw). Keeps the runtime format-agnostic.</td></tr><tr><td class="a-left">Reuse one runtime for chat + embeddings</td><td class="a-left"><code>embed()</code> clears KV state — use a dedicated runtime for embeddings, never one mid-conversation.</td></tr><tr><td class="a-left">Let the caller wire the stack</td><td class="a-left">Order and budget-derivation are load-bearing; centralizing them in the ctor prevents mis-assembly.</td></tr></tbody></table></div>
+<h2 id="tradeoffs">Tradeoffs</h2>
+<ul><li><strong><code>runtime_reserve_bytes</code> is dead code</strong> (<code>src/runtime.cpp:26</code>). The weight ceiling now comes entirely from <code>plan.weight_ceiling</code>; this older reserve helper is no longer on any path.</li><li><strong>Budget failure is loud by default.</strong> An infeasible plan throws; <code>--ram-budget-force</code> is the deliberate override, and it runs with the planner&#x27;s safe minimum defaults.</li><li><strong>Stats are collected once, at the end.</strong> <code>GenStats</code> reflects the completed run; live per-step data comes through the optional <code>ProfileSink</code>, not the return value. The Dart <code>SipllmStats</code> mirror is a <strong>subset</strong> — it drops the per-phase <code>load_s</code>/<code>prefill_s</code>/<code>decode_s</code>.</li></ul>
+<h2 id="source-files">Source files</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">File</th><th class="a-left">Role</th></tr></thead><tbody><tr><td class="a-left"><code>include/llm/runtime.h</code></td><td class="a-left"><code>Runtime</code>, <code>GenStats</code>, <code>open_model</code>, <code>TokenCallback</code>/<code>ProfileSink</code> hooks</td></tr><tr><td class="a-left"><code>src/runtime.cpp</code></td><td class="a-left"><code>open_model</code> magic-sniff (13), ctor plan+build (32), <code>generate</code> prefill+decode (72), dead <code>runtime_reserve_bytes</code> (26)</td></tr><tr><td class="a-left"><code>include/llm/mem_plan.h</code></td><td class="a-left">the plan the ctor applies (<a href="memory-planner.html">memory planner</a>)</td></tr><tr><td class="a-left"><code>include/llm/loader.h</code></td><td class="a-left">loader options derived from the plan (<a href="streaming-loader.html">streaming loader</a>, <a href="layer-residency.html">layer residency</a>)</td></tr><tr><td class="a-left"><code>include/llm/kv_cache.h</code> / <code>include/llm/transformer.h</code></td><td class="a-left">KV + forward pass the runtime drives (<a href="kv-cache.html">KV cache</a>, <a href="transformer.html">transformer</a>)</td></tr></tbody></table></div>
+<h2 id="future-work">Future work</h2>
+<ul><li><strong>Remove the dead <code>runtime_reserve_bytes</code></strong> helper now that the planner owns the ceiling.</li><li><strong>Incremental stats streaming</strong> so the UI can read throughput mid-run without the <code>ProfileSink</code> plumbing.</li><li><strong>A first-class embeddings runtime</strong> so <code>embed()</code> need not share (and clear) chat KV state.</li></ul>
+      <nav class="page-footer-nav"><a class="pn prev" href="prefetch.html"><span>Previous</span>Prefetch</a><a class="pn next" href="transformer.html"><span>Next</span>Transformer</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#problem">Problem</a></li><li class="toc-h2"><a href="#design">Design</a></li><li class="toc-h3"><a href="#opening-a-model">Opening a model</a></li><li class="toc-h3"><a href="#construction-plan-then-build">Construction — plan, then build</a></li><li class="toc-h3"><a href="#generation-one-prefill-then-a-decode-loop">Generation — one prefill, then a decode loop</a></li><li class="toc-h2"><a href="#measured">Measured</a></li><li class="toc-h2"><a href="#alternatives-considered">Alternatives considered</a></li><li class="toc-h2"><a href="#tradeoffs">Tradeoffs</a></li><li class="toc-h2"><a href="#source-files">Source files</a></li><li class="toc-h2"><a href="#future-work">Future work</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
