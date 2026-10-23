@@ -22,25 +22,26 @@
     <div class="search-results" id="search-results" hidden></div>
   </div>
   <div class="topbar-right">
-    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <span class="version-badge">v0.6.0</span>
     <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
   </div>
 </header>
 <div class="layout">
-  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html" class="active" aria-current="page">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Examples</div><ul><li><a href="applications.html">Applications</a></li><li><a href="recipes.html">Recipes</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html" class="active" aria-current="page">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
   <div class="sidebar-scrim" id="sidebar-scrim"></div>
   <main id="content" class="content">
     <article class="page ">
       <div class="breadcrumb">API reference <span aria-hidden="true">/</span> C ABI</div>
       <h1>C ABI reference</h1>
-      <p><code>bindings/flutter/sipllm_flutter/ffi/sipllm_ffi.h</code> is the stable C ABI over the C++ streaming engine — the <em>only</em> surface Dart (or any other language) talks to. The engine&#x27;s headers use <code>std::string</code>, <code>std::function</code>, and <code>std::unique_ptr</code>, none of which is FFI-safe; this header flattens them into opaque handles, plain-old-data structs, and C function-pointer callbacks. It is intentionally <strong>additive</strong> over the engine: it adds no math and changes no defaults — a zero-initialized <code>sipllm_params</code> reproduces the CLI&#x27;s behavior.</p>
+      <p><code>bindings/flutter/sipllm_flutter/ffi/sipllm_ffi.h</code> is the stable C ABI over the C++ streaming engine — the <em>only</em> surface Dart (or any other language) talks to. The engine&#x27;s headers use <code>std::string</code>, <code>std::function</code>, and <code>std::unique_ptr</code>, none of which is FFI-safe; this header flattens them into opaque handles, plain-old-data structs, and C function-pointer callbacks. It is intentionally <strong>additive</strong> over the engine: it adds no math. Start from <code>sipllm_params_default()</code>: a zero-initialized <code>sipllm_params</code> is <strong>not</strong> the CLI&#x27;s configuration (it selects the static scheduler, zero stream buffers and no async prefetch).</p>
 <div class="callout note"><div class="callout-title">Reference</div><p>Signatures below are copied verbatim from <code>sipllm_ffi.h</code>. Every exported function is annotated <code>SIPLLM_API</code> (<code>__attribute__((visibility(&quot;default&quot;)))</code>, or <code>__declspec(dllexport)</code> on Windows). The higher-level <a href="api-dart.html">Dart wrapper</a> mirrors these one-to-one; the underlying math lives in the <a href="api-cpp.html">C++ engine</a>.</p></div>
 <h2 id="threading-contract">Threading contract</h2>
 <p>The header states the contract explicitly:</p>
 <ul><li>A <code>sipllm_ctx</code> is <strong>NOT</strong> thread-safe for concurrent <code>generate()</code> calls — drive one context from one worker isolate/thread at a time. A context is <strong>thread-affine after open</strong>.</li><li><code>sipllm_cancel()</code> <strong>IS</strong> safe to call from another thread while <code>generate()</code> runs; it flips an atomic the decode loop checks at every token boundary.</li><li><code>sipllm_embed()</code> <strong>clears KV state</strong> — use a dedicated context for embeddings if you also hold a live conversation.</li></ul>
 <h2 id="enums">Enums</h2>
 <pre><code class="language-c">/* ThreadPool schedule policy (octa-core work distribution). Mirrors
- * llm::ThreadPool::SchedulePolicy. Proportional2 is the engine&#x27;s CLI default. */
+ * llm::ThreadPool::SchedulePolicy. Fixed16 is the engine default (CLI and
+ * sipllm_params_default); a zero-initialized sipllm_params selects STATIC (0). */
 enum {
   SIPLLM_SCHED_STATIC = 0,
   SIPLLM_SCHED_FIXED8 = 1,
@@ -56,13 +57,13 @@ enum {
   SIPLLM_POOL_LAST = 0, /* last-token hidden state (correct for causal decoders) */
   SIPLLM_POOL_MEAN = 1  /* mean over per-token last-layer hidden states          */
 };</code></pre>
-<p>The scheduler enum mirrors <code>llm::ThreadPool::SchedulePolicy</code> (see the <a href="api-cpp.html#threadpool-thread-pool-h">C++ engine</a> reference). <code>SIPLLM_SCHED_PROPORTIONAL2</code> is the CLI default. Note the <a href="auto-tuning.html">auto-tuner</a> only benchmarks four of these seven policies.</p>
+<p>The scheduler enum mirrors <code>llm::ThreadPool::SchedulePolicy</code> (see the <a href="api-cpp.html#threadpool-thread-pool-h">C++ engine</a> reference). <code>SIPLLM_SCHED_FIXED16</code> is the default (CLI and <code>sipllm_params_default</code>). Note the <a href="auto-tuning.html">auto-tuner</a> only benchmarks four of these seven policies.</p>
 <h2 id="opaque-handle">Opaque handle</h2>
 <pre><code class="language-c">typedef struct sipllm_ctx sipllm_ctx; /* opaque runtime handle */</code></pre>
 <p>Wraps a <code>llm::Runtime</code>. Created by <code>sipllm_open</code>, destroyed by <code>sipllm_close</code>.</p>
 <h2 id="pod-structs">POD structs</h2>
 <h3 id="sipllm-params-open-time-knobs"><code>sipllm_params</code> — open-time knobs</h3>
-<p>Zero-initialize then override; <code>sipllm_params_default()</code> fills the recommended edge defaults. All bool-ish fields are <code>0</code>/non-<code>0</code>.</p>
+<p>Call <code>sipllm_params_default()</code> first, then override fields; it fills the recommended edge defaults (a zero-initialized struct does not). All bool-ish fields are <code>0</code>/non-<code>0</code>.</p>
 <pre><code class="language-c">typedef struct {
   uint64_t ram_budget_bytes; /* 0 = unlimited streaming; else hard peak-RSS ceiling (--ram-budget) */
   int32_t threads;           /* &gt;0 fixed; 0 = hardware_concurrency; -1 = auto-tune+cache profile   */
@@ -70,12 +71,14 @@ enum {
   int32_t n_buffers;         /* async prefetch ring buffers (&gt;=1)                                  */
   int32_t use_mmap;          /* mmap backend instead of pread                                      */
   int32_t async_prefetch;    /* background double-buffered prefetch thread                         */
-  int32_t fast_quant;        /* int8 SDOT kernel for Q8_0 (--fast); numerically equivalent         */
+  int32_t fast_quant;        /* int8 kernels for Q8_0/Q4_K/Q6_K (--fast); int8-activation approx. */
   int32_t stream_lm_head;    /* stream non-tied LM head off disk (RAM&lt;-&gt;speed knob)                */
   int32_t residency_fp32;    /* FP32 residency (else Quantized — the memory-bounded default)       */
   int32_t force_budget;      /* honor ram_budget even below the safe floor (--ram-budget-force)    */
   int32_t schedule_policy;   /* SIPLLM_SCHED_*                                                     */
+  int32_t spec_draft;        /* prompt-lookup speculative decoding, max draft tokens (--spec N); 0 = off */
 } sipllm_params;</code></pre>
+<p><strong>Compatibility:</strong> <code>spec_draft</code> was appended to <code>sipllm_params</code>. Earlier field offsets are unchanged, but the library copies the whole struct (<code>sizeof(sipllm_params)</code>), so a C/C++ caller compiled against the header <em>before</em> <code>spec_draft</code> existed must be rebuilt; a prebuilt one would pass a shorter struct and the library would read past its end. The in-tree Dart bindings are generated from this header and always match. A struct-size/version field to make future additions binary-compatible is planned, not implemented.</p>
 <h3 id="sipllm-sampler-sampling-configuration"><code>sipllm_sampler</code> — sampling configuration</h3>
 <p>Mirrors <code>llm::SamplerConfig</code>. <code>temperature &lt;= 0</code> selects greedy decoding.</p>
 <pre><code class="language-c">typedef struct {
@@ -128,7 +131,7 @@ typedef int32_t (*sipllm_token_cb)(const char* piece, int64_t token_id, void* us
 <p>All 18 exported functions, grouped as the header groups them.</p>
 <h3 id="lifecycle">Lifecycle</h3>
 <pre><code class="language-c">SIPLLM_API void sipllm_params_default(sipllm_params* out);</code></pre>
-<p>Fill <code>out</code> with recommended edge defaults (streaming, quantized residency, hw threads, Proportional2, async prefetch, repeat_penalty 1.1).</p>
+<p>Fill <code>out</code> with recommended edge defaults (streaming, quantized residency, hw threads, Fixed16, async prefetch, repeat_penalty 1.1).</p>
 <pre><code class="language-c">SIPLLM_API void sipllm_sampler_default(sipllm_sampler* out);</code></pre>
 <p>Fill <code>out</code> with default sampler configuration.</p>
 <pre><code class="language-c">SIPLLM_API sipllm_ctx* sipllm_open(const char* model_path, const sipllm_params* p,
@@ -183,7 +186,7 @@ typedef int32_t (*sipllm_token_cb)(const char* piece, int64_t token_id, void* us
   <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
   (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
   <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
-  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.6.0</div>
 </footer>
 <script src="assets/search-index.js"></script>
 <script src="assets/app.js"></script>
