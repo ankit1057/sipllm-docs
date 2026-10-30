@@ -1,0 +1,4 @@
+
+# local render-check output (never publish)
+.chrome-check/
+shot_*.png

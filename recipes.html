@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en" data-slug="recipes">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recipes · SipLLM docs</title>
+<meta name="description" content="Commands run from the root of a SipLLM checkout. $MODEL is a path to a GGUF file. The examples use TinyLlama-1.1B Q4_K_M because the measured numbers on this…">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="topbar">
+  <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+  <a class="brand" href="index.html">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">SipLLM</span>
+    <span class="brand-sub">docs</span>
+  </a>
+  <div class="search" role="search">
+    <input type="search" id="search-input" placeholder="Search the docs…  (press /)"
+           aria-label="Search documentation" autocomplete="off">
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+  <div class="topbar-right">
+    <span class="version-badge">v0.7.0</span>
+    <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Examples</div><ul><li><a href="applications.html">Applications</a></li><li><a href="recipes.html" class="active" aria-current="page">Recipes</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+  <main id="content" class="content">
+    <article class="page ">
+      <div class="breadcrumb">Examples <span aria-hidden="true">/</span> Recipes</div>
+      <h1>Recipes</h1>
+      <div class="hero"><p class="lead"><strong>Copy-paste starting points, one per common use.</strong> Every flag and function on this page exists in the source: the CLI's argument parser in <code>main.cpp</code>, the server in <code>server/server.cpp</code>, the C ABI in <code>sipllm_ffi.h</code> and the Dart package in <code>bindings/flutter/</code>. Wherever output is shown, it is illustrative: the shape is real, the values are elided. To decide whether SipLLM fits your application at all, start with <a href="applications.html">Applications</a>.</p></div>
+<div class="callout note"><div class="callout-title">Conventions</div><p>Commands run from the root of a SipLLM checkout. <code>$MODEL</code> is a path to a GGUF file. The examples use TinyLlama-1.1B Q4_K_M because the measured numbers on this site are for that file. Sizes for <code>--ram-budget</code> accept <code>K</code>, <code>M</code> or <code>G</code> suffixes (powers of 1024), for example <code>512M</code> or <code>1.5G</code>; <code>0</code> means stream everything with no ceiling.</p></div>
+<h2 id="build-and-fetch-a-model">Build and fetch a model</h2>
+<pre><code class="language-bash">git clone https://github.com/ankit1057/sipllm.git &amp;&amp; cd sipllm
+make                  # build/llm plus tools (inspect_gguf, dump_logits, ...)
+make server           # build/llm_server, needed only for recipe 4
+
+./sipllm pull tinyllama:q4_k_m             # cached under ~/.sipllm/models
+MODEL=&quot;$(./sipllm which tinyllama:q4_k_m)&quot;  # prints the local path</code></pre>
+<p>If you installed with <code>install.sh</code> instead, <code>sipllm run &lt;name&gt; [engine args...]</code> passes every argument after the model name to the engine, so each <code>./build/llm &quot;$MODEL&quot; ...</code> line below also works as <code>sipllm run tinyllama:q4_k_m ...</code>.</p>
+<!-- verify: make && make server && ./sipllm pull tinyllama:q4_k_m && ls -l "$(./sipllm which tinyllama:q4_k_m)" -->
+<h2 id="1-run-a-model-in-a-fixed-ram-budget">1. Run a model in a fixed RAM budget</h2>
+<p>Give the engine a hard peak-RSS ceiling. The memory planner pins as many layers as fit and streams the rest.</p>
+<pre><code class="language-bash">./build/llm &quot;$MODEL&quot; -p &quot;The capital of France is&quot; -n 40 --greedy \
+  --ctx 512 --ram-budget 256M</code></pre>
+<ul><li>Before loading, the planner prints its execution plan to stderr. If the budget cannot be met, the run stops with <code>RAM budget impossible. Use --ram-budget-force to run anyway.</code></li><li>The planner prices the KV cache at the full context. Pass an explicit <code>--ctx</code> that matches your use; without one, it steps the context down until the plan fits.</li><li>When generation ends, the stats block shows <code>pinned layers: N / M</code> and how many MB were streamed from disk. Its <code>peak rss</code> line is the resident size at the moment generation ends. For the true peak, wrap the command in <code>/usr/bin/time</code> (recipe 8).</li></ul>
+<p>To run a model much larger than your free RAM, use the exact settings of the measured 8B and 13B runs. Expect well under 1 tok/s at this extreme (0.55 tok/s for the 8B on an Apple M3):</p>
+<pre><code class="language-bash">./sipllm pull llama3.1:8b:q4_k_m
+./build/llm &quot;$(./sipllm which llama3.1:8b:q4_k_m)&quot; -p &quot;The capital of France is&quot; \
+  -n 20 --greedy --ctx 512 --stream-lm-head --no-async</code></pre>
+<!-- verify: ./build/llm "$MODEL" -p "The capital of France is" -n 40 --greedy --ctx 512 --ram-budget 256M ; then the same with --ram-budget 64M to see the refusal message -->
+<h2 id="2-fully-resident-fast-mode">2. Fully resident, fast mode</h2>
+<p>When the machine has the RAM, pin every layer and turn on the int8 kernels.</p>
+<pre><code class="language-bash">./build/llm &quot;$MODEL&quot; -p &quot;The capital of France is&quot; -n 64 --greedy \
+  --ctx 512 --ram-budget 768M --fast</code></pre>
+<ul><li>In the measured run, 768M was enough to pin all 22 layers of this file at <code>--ctx 512</code>. If the stats block shows fewer, raise the budget.</li><li><code>--fast</code> covers Q8_0, Q4_K and Q6_K weights. It quantises activations to int8, so output can differ from the exact path at near-ties. The stats line <code>fast kernel:</code> reports <code>on</code>, or <code>off (no int8 kernel for this CPU)</code>.</li><li>Optional and experimental: <code>SIPLLM_FAST_LAYOUT=il4 ./build/llm ... --fast</code> repacks resident Q4_K and Q6_K matrices for the interleaved kernels. The scorecard&#x27;s best M3 decode figure used it.</li><li>On phones with big and little cores, add <code>--schedule fixed16</code>. On the measured 2+6-core phone, it decoded at more than twice the speed of <code>proportional2</code>.</li></ul>
+<!-- verify: ./build/llm "$MODEL" -p "The capital of France is" -n 64 --greedy --ctx 512 --ram-budget 768M --fast  (check "pinned layers: 22 / 22" and "fast kernel: on") -->
+<h2 id="3-interactive-chat">3. Interactive chat</h2>
+<pre><code class="language-bash">./build/llm &quot;$MODEL&quot; --chat --ctx 2048 --ram-budget 768M --fast</code></pre>
+<ul><li><code>--chat</code> (or <code>-i</code>) opens a REPL. Commands: <code>/help</code>, <code>/clear</code> (resets history and KV cache), <code>/save &lt;path&gt;</code> (writes the session), <code>/bye</code> or <code>/exit</code>. Start a line with <code>&quot;&quot;&quot;</code> to type several lines, and end with <code>&quot;&quot;&quot;</code>.</li><li>Interactive mode formats the conversation with a chat template chosen from the model&#x27;s metadata. One-shot <code>-p</code> runs send raw text with no template.</li><li>Interactive mode turns on context reuse, so each turn reprocesses only the new tail. It generates up to 512 tokens per reply unless you pass <code>-n</code>.</li><li><code>--save-session F</code> writes the session when you exit, and <code>--load-session F</code> restores it on the next start. A session file only loads into the model that wrote it.</li></ul>
+<!-- verify: ./build/llm "$MODEL" --chat --ctx 2048 --ram-budget 768M --fast ; type a question, then /save /tmp/s.sips, then /bye ; restart with --load-session /tmp/s.sips -->
+<h2 id="4-local-openai-compatible-server-this-machine-only">4. Local OpenAI-compatible server (this machine only)</h2>
+<div class="callout warn"><div class="callout-title">Read before starting the server</div><p>Since v0.6.0, <code>llm_server</code> listens on <strong>127.0.0.1 only</strong> unless you pass <code>--host</code>, and it refuses requests with <code>&quot;agent&quot;: true</code> (HTTP 403) unless you start it with <code>--allow-agent</code>. It has <strong>no authentication</strong>. Agent mode runs a tool loop that can execute shell commands and write files in the server&#x27;s working directory, so anyone who can reach the port can then run commands as you. Do not combine <code>--host</code> with <code>--allow-agent</code> on a network you do not control. The CLI (outside LAN worker mode) and the C ABI open no listening socket. Prefer them whenever you can.</p></div>
+<p>Start the server and call it from the same machine:</p>
+<pre><code class="language-bash">./build/llm_server &quot;$MODEL&quot; --port 8080 --ctx 2048
+
+# in a second terminal, on the same machine
+curl -s http://127.0.0.1:8080/v1/chat/completions \
+  -H &#x27;Content-Type: application/json&#x27; \
+  -d &#x27;{&quot;messages&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;Name three primary colours.&quot;}],&quot;max_tokens&quot;:64,&quot;temperature&quot;:0}&#x27;
+
+curl -s http://127.0.0.1:8080/api/model      # model, layer count, tokenizer, backend</code></pre>
+<ul><li>The server accepts only <code>--port</code>, <code>--host</code>, <code>--allow-agent</code>, <code>--residency</code>, <code>--mmap</code>, <code>--threads</code> and <code>--ctx</code>. It ignores any other flag without an error, so <code>--ram-budget</code> and <code>--fast</code> have no effect and it always runs the default streaming configuration.</li><li><code>--host 0.0.0.0</code> (or a LAN address) makes the server reachable from other machines, and it prints a warning when you do. Put your own access control in front of it.</li><li>It runs one generation at a time. <code>&quot;stream&quot;: true</code> is accepted but ignored, so the response always arrives in one piece.</li><li><code>temperature</code> at or below 0 means greedy decoding. <code>max_tokens</code> defaults to 256.</li></ul>
+<!-- verify: ./build/llm_server "$MODEL" --port 8080 --ctx 2048 ; run both curl commands ; lsof -nP -iTCP:8080 -sTCP:LISTEN shows 127.0.0.1:8080 ; a request with "agent":true returns 403 -->
+<h2 id="5-embed-the-engine-through-the-c-abi">5. Embed the engine through the C ABI</h2>
+<p>The C ABI is the one surface meant for other languages: opaque handles, plain structs and a C token callback. Save this as <code>embed_demo.c</code>:</p>
+<pre><code class="language-c">#include &quot;sipllm_ffi.h&quot;
+#include &lt;stdio.h&gt;
+
+static int32_t on_token(const char* piece, int64_t id, void* user) {
+  (void)id; (void)user;
+  fputs(piece, stdout);
+  fflush(stdout);
+  return 1; /* return 0 to stop early */
+}
+
+int main(int argc, char** argv) {
+  if (argc &lt; 2) { fprintf(stderr, &quot;usage: %s model.gguf\n&quot;, argv[0]); return 2; }
+  sipllm_set_log_level(1);                    /* errors only */
+
+  sipllm_params p;
+  sipllm_params_default(&amp;p);                  /* always start from the defaults */
+  p.ram_budget_bytes = 256ull * 1024 * 1024;  /* hard peak-RSS ceiling */
+  p.max_ctx = 512;
+
+  char err[512] = {0};
+  sipllm_ctx* ctx = sipllm_open(argv[1], &amp;p, err, (int32_t)sizeof err);
+  if (!ctx) { fprintf(stderr, &quot;open failed: %s\n&quot;, err); return 1; }
+
+  sipllm_sampler s;
+  sipllm_sampler_default(&amp;s);
+  s.temperature = 0.0f;                       /* greedy */
+
+  sipllm_stats st;
+  int32_t n = sipllm_generate(ctx, &quot;The capital of France is&quot;, 32, &amp;s,
+                              on_token, NULL, &amp;st, err, (int32_t)sizeof err);
+  if (n &lt; 0) { fprintf(stderr, &quot;\ngenerate failed: %s\n&quot;, err); sipllm_close(ctx); return 1; }
+
+  printf(&quot;\n%d tokens, %.1f tok/s decode, %d/%d layers pinned\n&quot;,
+         n, st.decode_tok_s, st.pinned_layers, st.n_layers);
+  sipllm_close(ctx);
+  return 0;
+}</code></pre>
+<p>Build the shared library, then compile and run against it:</p>
+<pre><code class="language-bash">FFI=bindings/flutter/sipllm_flutter/ffi
+LIB=&quot;$PWD/bindings/flutter/sipllm_flutter/build/desktop&quot;
+&quot;$FFI/build_desktop.sh&quot;                       # -&gt; $LIB/libsipllm_ffi.dylib (macOS) or .so (Linux)
+cc -I&quot;$FFI&quot; embed_demo.c -L&quot;$LIB&quot; -lsipllm_ffi -Wl,-rpath,&quot;$LIB&quot; -o embed_demo
+./embed_demo &quot;$MODEL&quot;</code></pre>
+<ul><li><code>build_desktop.sh</code> compiles every source file with the same flags (<code>CXX</code>, default <code>clang++</code>, and <code>ARCHFLAGS</code>, default empty). On macOS arm64 the compiler&#x27;s default target already includes the SDOT instruction. On Linux aarch64 the default build leaves out the int8 <code>--fast</code> kernels and prints a compile-time message saying so. If the host supports SDOT, build with <code>ARCHFLAGS=&quot;-march=armv8.2-a+dotprod&quot;</code>. Use <code>CXX=g++</code> if <code>clang++</code> is not installed.</li><li>Call <code>sipllm_params_default()</code> before you change any field. A zero-initialised <code>sipllm_params</code> is <strong>not</strong> the same: it selects the static scheduler, zero stream buffers and no async prefetch.</li><li>One <code>sipllm_ctx</code> serves one thread at a time. <code>sipllm_cancel()</code> is the one call that is safe from another thread; it stops generation at the next token boundary.</li><li><code>sipllm_embed()</code> clears the KV cache. Open a second context for embeddings if a conversation is live.</li><li><code>sipllm_params</code> grew a field (<code>spec_draft</code>) in this release. Rebuild any caller compiled against an older header.</li><li><code>smoke_test.c</code> in the same <code>ffi/</code> directory is a longer example that also covers cancellation and embeddings.</li></ul>
+<!-- verify: bindings/flutter/sipllm_flutter/ffi/build_desktop.sh && cc -Ibindings/flutter/sipllm_flutter/ffi embed_demo.c -L"$PWD/bindings/flutter/sipllm_flutter/build/desktop" -lsipllm_ffi -Wl,-rpath,"$PWD/bindings/flutter/sipllm_flutter/build/desktop" -o embed_demo && ./embed_demo "$MODEL" -->
+<h2 id="6-use-it-from-flutter-dart">6. Use it from Flutter / Dart</h2>
+<div class="callout warn"><div class="callout-title">Host-verified only</div><p>The Dart, isolate and FFI path passes its tests on macOS (Apple M3). The Android APK and on-device inference through the plugin have <strong>not</strong> been run on a phone or watch yet.</p></div>
+<p>Add the plugin as a path dependency. The plugin&#x27;s native build compiles the engine sources from the repository root, so point the path inside a SipLLM checkout:</p>
+<pre><code class="language-yaml">dependencies:
+  sipllm_flutter:
+    path: /path/to/sipllm/bindings/flutter/sipllm_flutter</code></pre>
+<pre><code class="language-dart">import &#x27;package:sipllm_flutter/sipllm_flutter.dart&#x27;;
+
+Future&lt;void&gt; runOnce(String modelPath) async {
+  final rt = await SipllmRuntime.open(
+    modelPath,
+    params: const SipllmParams(fastQuant: true).copyWithBudgetMiB(768),
+  );
+  try {
+    final out = StringBuffer();
+    await for (final tok in rt.generate(&#x27;The capital of France is&#x27;,
+        maxNew: 32, sampler: const SipllmSampler.greedy())) {
+      out.write(tok.piece);              // update your UI here
+    }
+    print(out);
+    final st = rt.lastStats;
+    if (st != null) {
+      print(&#x27;${st.decodeTokensPerSecond.toStringAsFixed(1)} tok/s, &#x27;
+          &#x27;${st.pinnedLayers}/${st.nLayers} layers pinned, &#x27;
+          &#x27;peak ${st.peakRssMiB.toStringAsFixed(0)} MiB&#x27;);
+    }
+  } finally {
+    await rt.close();
+  }
+}</code></pre>
+<ul><li>Inference runs on a worker isolate. Call <code>rt.cancel()</code> from the UI to stop at the next token. <code>generate()</code> errors if a generation is already in flight.</li><li><code>generate()</code> sends raw text. For a chat model, format the conversation with the model&#x27;s chat template yourself.</li><li><code>rt.embed(text)</code> returns an L2-normalised <code>Float32List</code> for the <code>EmbeddingStore</code>, and clears the KV cache, so use a separate runtime for it.</li><li>On Android, the plugin&#x27;s Gradle build compiles <code>libsipllm_ffi.so</code> per ABI through <code>src/CMakeLists.txt</code>. On desktop, run <code>ffi/build_desktop.sh</code> first, or set <code>SIPLLM_FFI_LIBRARY</code>, or pass <code>libraryPath:</code> to <code>SipllmRuntime.open</code>.</li><li>For downloads, <code>DownloadManager().enqueue(url: ..., destPath: ..., sha256: ...)</code> resumes across restarts.</li></ul>
+<!-- verify: cd bindings/flutter/sipllm_flutter && ffi/build_desktop.sh && SIPLLM_TEST_MODEL="$MODEL" flutter test test/runtime_ffi_test.dart -->
+<h2 id="7-pool-two-machines-on-a-lan">7. Pool two machines on a LAN</h2>
+<p>Split one model&#x27;s layers between a coordinator and a worker on the same network. Each machine keeps its own RAM budget.</p>
+<p><strong>On both machines:</strong> put the same GGUF file in place, and find its layer count:</p>
+<pre><code class="language-bash">./build/inspect_gguf &quot;$MODEL&quot; | grep block_count     # TinyLlama-1.1B has 22</code></pre>
+<p><strong>Create one shared secret</strong> of at least 16 characters, and set the identical value on both machines. The engine reads it only from the environment (or from a file named by <code>SIPLLM_LAN_TOKEN_FILE</code>), never from the command line:</p>
+<pre><code class="language-bash">openssl rand -hex 16          # run once; copy the output to both machines
+export SIPLLM_LAN_TOKEN=&#x27;paste-the-same-value-here&#x27;</code></pre>
+<p><strong>Worker</strong> (machine B, LAN address 192.168.1.20 in this example) serves layers 11 to 21:</p>
+<pre><code class="language-bash">./build/llm &quot;$MODEL&quot; --worker --layers 11:22 --listen 192.168.1.20:7070 \
+  --ctx 512 --ram-budget 400M</code></pre>
+<p><strong>Coordinator</strong> (machine A) runs layers 0 to 10 plus the embeddings and output head:</p>
+<pre><code class="language-bash">./build/llm &quot;$MODEL&quot; -p &quot;The three most important inventions in history are&quot; \
+  -n 64 --greedy --ctx 512 --ram-budget 400M --nodes 192.168.1.20:7070:11-22</code></pre>
+<ul><li>Layer ranges are end-exclusive. The coordinator owns <code>[0, A)</code>; worker ranges must be contiguous and end at the layer count. Several workers: <code>--nodes h1:p1:11-17,h2:p2:17-22</code>.</li><li>Every node must use the same model file, <code>--ctx</code>, <code>--fast</code> setting, <code>--kv-q8</code> setting and <code>--residency</code>. The worker checks a fingerprint and refuses a mismatch. <code>--ram-budget</code> may differ per node.</li><li><code>--listen</code> takes an explicit IPv4 address. Use the machine&#x27;s LAN address, not <code>0.0.0.0</code>.</li><li>Traffic is authenticated but <strong>not encrypted</strong>. Activations can reveal prompt content to anyone who can read the network. Use only on a network you trust.</li><li>The coordinator&#x27;s stats block gains a <code>lan worker:</code> line: calls, MB sent and received, KB per token, and time spent waiting on the worker. In the measured Wi-Fi run, waiting dominated, and decode fell to 2.6–2.8 tok/s from 15.2–15.3 on one machine.</li></ul>
+<!-- verify: on two hosts, run the worker then the coordinator commands above with the same SIPLLM_LAN_TOKEN; compare output to a single-machine run with --ram-budget 400M -->
+<h2 id="8-benchmark-your-own-device">8. Benchmark your own device</h2>
+<p>Measure one configuration with the OS&#x27;s peak-RSS figure, which is the authoritative number on this site:</p>
+<pre><code class="language-bash"># macOS uses /usr/bin/time -l; Linux needs GNU time (/usr/bin/time -v)
+if [ &quot;$(uname -s)&quot; = Darwin ]; then T=-l; else T=-v; fi
+/usr/bin/time $T ./build/llm &quot;$MODEL&quot; -p &quot;Once upon a time&quot; -n 48 --greedy \
+  --ctx 512 --threads 4 --no-autotune --schedule fixed16 --ram-budget 0 2&gt; run.log
+
+grep -i &quot;maximum resident set size&quot; run.log     # bytes on macOS, kbytes on Linux
+grep -E &quot;pinned layers|decode:|prefill:|TTFT:|streamed:&quot; run.log
+./build/llm &quot;$MODEL&quot; --profile-info              # hardware id and details, for your report</code></pre>
+<p>Illustrative shape of the engine&#x27;s stats block (values elided):</p>
+<pre><code class="language-text">── sipllm ────────────────
+peak rss:        … MB
+pinned layers:   … / 22
+fast kernel:     off
+decode:          … tok/s
+prefill:         … tok/s
+TTFT:            … s
+...
+streamed:        … MB (from disk)
+prefetch:        … hits / … misses</code></pre>
+<p>To sweep the whole RAM-versus-speed dial, use the harness. It picks up only these two cache file names:</p>
+<pre><code class="language-bash">./sipllm pull tinyllama:q4_k_m        # -&gt; ~/.sipllm/models/tinyllama-q4_k_m.gguf
+./sipllm pull smollm2:135m            # -&gt; ~/.sipllm/models/smollm2-135m.gguf
+BUDGETS=&quot;0 256M 512M 768M&quot; N=3 ./scripts/bench_ram_budget.sh</code></pre>
+<ul><li>The sweep writes <code>bench/results/ram-budget-&lt;host&gt;-&lt;date&gt;.json</code> and prints a table. It builds first unless <code>SKIP_BUILD=1</code>, and it refuses to run while the machine&#x27;s load is above the thread count.</li><li><code>--no-autotune</code> and an explicit <code>--schedule</code> keep runs comparable; otherwise the auto-tuner may pick a different thread policy.</li><li>Numbers are warm-cache unless you purge the page cache. When you report results, state the model, quantisation, RAM budget, hardware, compiler and commit, as every result on this site does.</li></ul>
+<!-- verify: on macOS and on Linux: /usr/bin/time $T ./build/llm "$MODEL" -p "Once upon a time" -n 48 --greedy --ctx 512 --threads 4 --no-autotune --schedule fixed16 --ram-budget 0 ; and BUDGETS="0 256M" N=1 ./scripts/bench_ram_budget.sh -->
+<h2 id="flag-reference-for-these-recipes">Flag reference for these recipes</h2>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Flag</th><th class="a-left">What it does</th><th class="a-left">Where</th></tr></thead><tbody><tr><td class="a-left"><code>-p</code>, <code>-n</code>, <code>--greedy</code>, <code>--seed</code>, <code>-t</code></td><td class="a-left">prompt, tokens to generate, greedy decoding, RNG seed, temperature</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--ctx N</code></td><td class="a-left">context length; the planner prices KV at this size</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--ram-budget SIZE</code></td><td class="a-left">hard peak-RSS ceiling; <code>0</code> streams everything</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--ram-budget-force</code></td><td class="a-left">run even when the plan is infeasible, with safe minimum settings</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--fast</code></td><td class="a-left">int8 kernels for Q8_0, Q4_K, Q6_K</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--stream-lm-head</code>, <code>--no-async</code></td><td class="a-left">stream the output head; disable the async prefetch thread</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--threads N</code>, <code>--schedule P</code>, <code>--no-autotune</code></td><td class="a-left">thread count, scheduler policy, skip the auto-tuner</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--chat</code> or <code>-i</code></td><td class="a-left">interactive REPL with a chat template</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--reuse</code>, <code>--save-session F</code>, <code>--load-session F</code></td><td class="a-left">reuse a shared prefix; persist the session across runs</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--spec N</code></td><td class="a-left">prompt-lookup speculative decoding, N draft tokens</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--semantic-cache-budget SIZE</code></td><td class="a-left">keep prompt-prefix KV in RAM and reuse it for later prompts that share the prefix (FP32 KV only)</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--worker</code>, <code>--layers A:B</code>, <code>--listen IP:PORT</code>, <code>--nodes host:port:A-B</code></td><td class="a-left">LAN pooling</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--profile-info</code></td><td class="a-left">print hardware details and exit</td><td class="a-left"><code>main.cpp</code></td></tr><tr><td class="a-left"><code>--port</code>, <code>--host</code>, <code>--allow-agent</code>, <code>--ctx</code>, <code>--threads</code>, <code>--residency</code>, <code>--mmap</code></td><td class="a-left">the only flags <code>llm_server</code> reads</td><td class="a-left"><code>server/server.cpp</code></td></tr></tbody></table></div>
+      <nav class="page-footer-nav"><a class="pn prev" href="applications.html"><span>Previous</span>Applications</a><a class="pn next" href="architecture.html"><span>Next</span>Overview</a></nav>
+    </article>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#build-and-fetch-a-model">Build and fetch a model</a></li><li class="toc-h2"><a href="#1-run-a-model-in-a-fixed-ram-budget">1. Run a model in a fixed RAM budget</a></li><li class="toc-h2"><a href="#2-fully-resident-fast-mode">2. Fully resident, fast mode</a></li><li class="toc-h2"><a href="#3-interactive-chat">3. Interactive chat</a></li><li class="toc-h2"><a href="#4-local-openai-compatible-server-this-machine-only">4. Local OpenAI-compatible server (this machine only)</a></li><li class="toc-h2"><a href="#5-embed-the-engine-through-the-c-abi">5. Embed the engine through the C ABI</a></li><li class="toc-h2"><a href="#6-use-it-from-flutter-dart">6. Use it from Flutter / Dart</a></li><li class="toc-h2"><a href="#7-pool-two-machines-on-a-lan">7. Pool two machines on a LAN</a></li><li class="toc-h2"><a href="#8-benchmark-your-own-device">8. Benchmark your own device</a></li><li class="toc-h2"><a href="#flag-reference-for-these-recipes">Flag reference for these recipes</a></li></ul></aside>
+  </main>
+</div>
+<footer class="site-footer">
+  <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
+  (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
+  <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.7.0</div>
+</footer>
+<script src="assets/search-index.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

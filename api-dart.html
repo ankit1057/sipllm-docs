@@ -22,12 +22,12 @@
     <div class="search-results" id="search-results" hidden></div>
   </div>
   <div class="topbar-right">
-    <span class="version-badge">v0.4.0 · portal v0.5</span>
+    <span class="version-badge">v0.7.0</span>
     <a class="repo-link" href="https://github.com/ankit1057/sipllm" target="_blank" rel="noopener">GitHub &#8599;</a>
   </div>
 </header>
 <div class="layout">
-  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html" class="active" aria-current="page">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
+  <div class="sidebar" id="sidebar"><nav class="sidebar-nav" aria-label="Documentation"><div class="nav-group"><div class="nav-group-title">Product</div><ul><li><a href="index.html">Overview</a></li><li><a href="what-is-sipllm.html">What is SipLLM?</a></li><li><a href="why-streaming.html">Why streaming?</a></li><li><a href="why-not-mmap.html">Why not mmap everything?</a></li><li><a href="why-another-runtime.html">Why another runtime?</a></li><li><a href="vision.html">Vision</a></li><li><a href="roadmap.html">Roadmap</a></li><li><a href="benchmarks.html">Benchmarks</a></li><li><a href="faq.html">FAQ</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Examples</div><ul><li><a href="applications.html">Applications</a></li><li><a href="recipes.html">Recipes</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Architecture</div><ul><li><a href="architecture.html">Overview</a></li><li><a href="streaming-loader.html">Streaming loader</a></li><li><a href="layer-residency.html">Layer residency</a></li><li><a href="memory-planner.html">Memory planner</a></li><li><a href="prefetch.html">Prefetch</a></li><li><a href="runtime.html">Runtime</a></li><li><a href="transformer.html">Transformer</a></li><li><a href="kv-cache.html">KV cache</a></li><li><a href="quantization.html">Quantization</a></li><li><a href="gguf-parser.html">GGUF parser</a></li><li><a href="tokenizer.html">Tokenizer</a></li><li><a href="thread-pool.html">Thread pool</a></li><li><a href="auto-tuning.html">Auto-tuning</a></li><li><a href="flutter-runtime.html">Flutter runtime</a></li><li><a href="wear-support.html">Wear OS support</a></li></ul></div><div class="nav-group"><div class="nav-group-title">API reference</div><ul><li><a href="api.html">Overview</a></li><li><a href="api-c.html">C ABI</a></li><li><a href="api-cpp.html">C++ engine</a></li><li><a href="api-dart.html" class="active" aria-current="page">Dart / Flutter</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Engineering journal</div><ul><li><a href="journal.html">Overview</a></li><li><a href="j-streaming-layers.html">How SipLLM streams layers</a></li><li><a href="j-bigger-than-ram.html">Running models larger than RAM</a></li><li><a href="j-lm-head.html">Streaming the LM head</a></li><li><a href="j-prefill.html">Prefill optimization</a></li><li><a href="j-prefetch.html">Predictive prefetch</a></li><li><a href="j-resident-weights.html">Resident weights</a></li><li><a href="j-q4k.html">Q4_K explained</a></li><li><a href="j-gguf.html">GGUF internals</a></li><li><a href="j-peak-rss.html">Why peak RSS matters</a></li><li><a href="j-android.html">Android inference</a></li></ul></div><div class="nav-group"><div class="nav-group-title">Project</div><ul><li><a href="design-decisions.html">Design decisions</a></li><li><a href="rfc-index.html">RFC index</a></li><li><a href="performance-history.html">Performance history</a></li><li><a href="competitive-analysis.html">Competitive analysis</a></li><li><a href="glossary.html">Glossary</a></li><li><a href="contributing.html">Contributor guide</a></li></ul></div></nav></div>
   <div class="sidebar-scrim" id="sidebar-scrim"></div>
   <main id="content" class="content">
     <article class="page ">
@@ -86,7 +86,8 @@ bool get isBusy;                           // a generation/embed is in flight</c
   this.streamLmHead = false,
   this.residencyFp32 = false,
   this.forceBudget = false,
-  this.schedulePolicy = SchedulePolicy.proportional2,
+  this.schedulePolicy = SchedulePolicy.fixed16,
+  this.specDraft = 0,
 });
 
 final int ramBudgetBytes;                  // hard peak-RSS ceiling (--ram-budget); 0 = unlimited
@@ -95,11 +96,12 @@ final int maxCtx;
 final int nBuffers;
 final bool useMmap;
 final bool asyncPrefetch;
-final bool fastQuant;                      // opt-in int8 SDOT kernel for Q8_0 (--fast)
+final bool fastQuant;                      // opt-in int8 kernels for Q8_0 / Q4_K / Q6_K (--fast)
 final bool streamLmHead;
 final bool residencyFp32;
 final bool forceBudget;
 final SchedulePolicy schedulePolicy;
+final int specDraft;                       // prompt-lookup speculative decoding, max draft tokens (--spec N); 0 = off
 
 SipllmParams copyWithBudgetMiB(int mib);   // convenience: budget in MiB
 SipllmParams copyWith({ /* per-field overrides */ });</code></pre>
@@ -192,10 +194,43 @@ final int id;</code></pre>
   fixed32(kSchedFixed32), proportional2(kSchedProportional2),
   proportional4(kSchedProportional4), adaptive(kSchedAdaptive);
   final int code;
-}                                          // proportional2 is the engine default
+}                                          // fixed16 is the engine default
 
 enum Pooling { last(kPoolLast), mean(kPoolMean); final int code; }
 enum TokenizerKind { sentencePiece, bpe, byte }</code></pre>
+<h2 id="agent-since-v0-7-0">Agent (since v0.7.0)</h2>
+<h3 id="sipllmagent"><code>SipllmAgent</code></h3>
+<p>A Nishachar agent bound to one loaded <code>SipllmRuntime</code>. The engine drives the conversation and parses tool calls. Your <code>execute</code> function runs each tool.</p>
+<pre><code class="language-dart">final agent = await SipllmAgent.create(rt, tools: const [
+  AgentTool(&#x27;read_file&#x27;, &#x27;Read a text file.&#x27;, [AgentToolParam(&#x27;path&#x27;)]),
+]);
+await for (final e in agent.run(&#x27;What does notes.txt say?&#x27;, (call) async {
+  return AgentToolResult(await File(call.arguments[&#x27;path&#x27;]!).readAsString());
+})) {
+  switch (e) {
+    case AgentTokenEvent(:final piece): stdout.write(piece);
+    case AgentToolCallEvent(:final call): print(&#x27;calling ${call.name}&#x27;);
+    case AgentToolResultEvent(:final result): print(&#x27;ran: ${result.text}&#x27;);
+    case AgentFinalEvent(:final text): print(&#x27;answer: $text&#x27;);
+    case AgentStoppedEvent(:final reason): print(&#x27;stopped: $reason&#x27;);
+  }
+}
+await agent.dispose();</code></pre>
+<pre><code class="language-dart">static Future&lt;SipllmAgent&gt; create(SipllmRuntime runtime, {
+  required List&lt;AgentTool&gt; tools,
+  int maxSteps = 8,
+  int maxNewTokens = 256,
+  AgentToolFormat format = AgentToolFormat.auto,
+  bool stopOnToolError = false,
+  String? systemPreamble,
+});
+Stream&lt;AgentEvent&gt; run(String goal, AgentToolExecutor execute);
+void cancel();
+Future&lt;void&gt; dispose();
+bool get isRunning;</code></pre>
+<ul><li><strong>The runtime is busy during a run.</strong> <code>SipllmRuntime.generate</code> calls are refused until the run ends.</li><li><strong>The agent shares the runtime&#x27;s KV cache.</strong> Call <code>SipllmRuntime.reset()</code> before chatting on it again.</li><li><strong>A throw from <code>execute</code></strong> is reported to the model as an error result.</li><li><strong><code>AgentToolResultEvent</code> reports what the tool actually returned,</strong> separately from what the model later says it did.</li></ul>
+<h3 id="agent-types">Agent types</h3>
+<div class="table-wrap"><table><thead><tr><th class="a-left">Type</th><th class="a-left">Fields</th></tr></thead><tbody><tr><td class="a-left"><code>AgentTool(name, description, params)</code></td><td class="a-left">The tool&#x27;s name, its description, and a list of <code>AgentToolParam</code></td></tr><tr><td class="a-left"><code>AgentToolParam(name, {type, required, description})</code></td><td class="a-left"><code>type</code> is an <code>AgentParamType</code>: <code>string</code>, <code>integer</code>, <code>number</code>, <code>boolean</code> or <code>stringArray</code></td></tr><tr><td class="a-left"><code>AgentToolCall</code></td><td class="a-left"><code>step</code>, <code>name</code>, <code>arguments</code> (<code>Map&lt;String, String&gt;</code>), <code>rawJson</code></td></tr><tr><td class="a-left"><code>AgentToolResult(text, {ok})</code></td><td class="a-left"><code>ok = false</code> means the model sees <code>text</code> as an error. <code>AgentToolResult.error(text)</code> is a shortcut.</td></tr><tr><td class="a-left"><code>AgentToolFormat</code></td><td class="a-left"><code>auto</code>, <code>compact</code>, <code>qwen</code></td></tr><tr><td class="a-left"><code>AgentStopReason</code></td><td class="a-left"><code>maxSteps</code>, <code>empty</code>, <code>toolError</code>, <code>cancelled</code>, <code>error</code></td></tr></tbody></table></div>
 <h2 id="device-architecture">Device / architecture</h2>
 <h3 id="sipllmdevice"><code>SipllmDevice</code></h3>
 <p>Static engine + accelerator capabilities that need no model. <code>SipllmDevice.load({String? libraryPath})</code>.</p>
@@ -392,14 +427,14 @@ enum TransferState {
 <ul><li><a href="api-c.html">C ABI reference</a> — the native surface this package binds.</li><li><a href="flutter-runtime.html">Flutter runtime</a> — the isolate + FFI architecture.</li><li><a href="wear-support.html">Wear support</a> — the Data Layer transfer design.</li></ul>
       <nav class="page-footer-nav"><a class="pn prev" href="api-cpp.html"><span>Previous</span>C++ engine</a><a class="pn next" href="journal.html"><span>Next</span>Overview</a></nav>
     </article>
-    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#inference-runtime">Inference runtime</a></li><li class="toc-h3"><a href="#sipllmruntime">SipllmRuntime</a></li><li class="toc-h3"><a href="#sipllmparams">SipllmParams</a></li><li class="toc-h3"><a href="#sipllmsampler">SipllmSampler</a></li><li class="toc-h3"><a href="#sipllmmodelinfo">SipllmModelInfo</a></li><li class="toc-h3"><a href="#sipllmstats">SipllmStats</a></li><li class="toc-h3"><a href="#sipllmtoken">SipllmToken</a></li><li class="toc-h3"><a href="#runtime-enums">Runtime enums</a></li><li class="toc-h2"><a href="#device-architecture">Device / architecture</a></li><li class="toc-h3"><a href="#sipllmdevice">SipllmDevice</a></li><li class="toc-h3"><a href="#archdetector-deviceprofile-cpuarch">ArchDetector, DeviceProfile, CpuArch</a></li><li class="toc-h2"><a href="#hugging-face-download-manager">Hugging Face download manager</a></li><li class="toc-h3"><a href="#huggingfacerepo">HuggingFaceRepo</a></li><li class="toc-h3"><a href="#downloadmanager">DownloadManager</a></li><li class="toc-h3"><a href="#downloadtask">DownloadTask</a></li><li class="toc-h3"><a href="#downloadprogress">DownloadProgress</a></li><li class="toc-h3"><a href="#downloadstate">DownloadState</a></li><li class="toc-h2"><a href="#on-device-embeddings">On-device embeddings</a></li><li class="toc-h3"><a href="#embeddingstore">EmbeddingStore</a></li><li class="toc-h3"><a href="#embeddingrecord-embeddingmatch">EmbeddingRecord, EmbeddingMatch</a></li><li class="toc-h2"><a href="#phone-wear-os-transfer">Phone &amp;harr; Wear OS transfer</a></li><li class="toc-h3"><a href="#weartransfer">WearTransfer</a></li><li class="toc-h3"><a href="#wearnode">WearNode</a></li><li class="toc-h3"><a href="#transferprogress">TransferProgress</a></li><li class="toc-h3"><a href="#transferdirection-transferstate">TransferDirection, TransferState</a></li><li class="toc-h2"><a href="#see-also">See also</a></li></ul></aside>
+    <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><ul><li class="toc-h2"><a href="#inference-runtime">Inference runtime</a></li><li class="toc-h3"><a href="#sipllmruntime">SipllmRuntime</a></li><li class="toc-h3"><a href="#sipllmparams">SipllmParams</a></li><li class="toc-h3"><a href="#sipllmsampler">SipllmSampler</a></li><li class="toc-h3"><a href="#sipllmmodelinfo">SipllmModelInfo</a></li><li class="toc-h3"><a href="#sipllmstats">SipllmStats</a></li><li class="toc-h3"><a href="#sipllmtoken">SipllmToken</a></li><li class="toc-h3"><a href="#runtime-enums">Runtime enums</a></li><li class="toc-h2"><a href="#agent-since-v0-7-0">Agent (since v0.7.0)</a></li><li class="toc-h3"><a href="#sipllmagent">SipllmAgent</a></li><li class="toc-h3"><a href="#agent-types">Agent types</a></li><li class="toc-h2"><a href="#device-architecture">Device / architecture</a></li><li class="toc-h3"><a href="#sipllmdevice">SipllmDevice</a></li><li class="toc-h3"><a href="#archdetector-deviceprofile-cpuarch">ArchDetector, DeviceProfile, CpuArch</a></li><li class="toc-h2"><a href="#hugging-face-download-manager">Hugging Face download manager</a></li><li class="toc-h3"><a href="#huggingfacerepo">HuggingFaceRepo</a></li><li class="toc-h3"><a href="#downloadmanager">DownloadManager</a></li><li class="toc-h3"><a href="#downloadtask">DownloadTask</a></li><li class="toc-h3"><a href="#downloadprogress">DownloadProgress</a></li><li class="toc-h3"><a href="#downloadstate">DownloadState</a></li><li class="toc-h2"><a href="#on-device-embeddings">On-device embeddings</a></li><li class="toc-h3"><a href="#embeddingstore">EmbeddingStore</a></li><li class="toc-h3"><a href="#embeddingrecord-embeddingmatch">EmbeddingRecord, EmbeddingMatch</a></li><li class="toc-h2"><a href="#phone-wear-os-transfer">Phone &amp;harr; Wear OS transfer</a></li><li class="toc-h3"><a href="#weartransfer">WearTransfer</a></li><li class="toc-h3"><a href="#wearnode">WearNode</a></li><li class="toc-h3"><a href="#transferprogress">TransferProgress</a></li><li class="toc-h3"><a href="#transferdirection-transferstate">TransferDirection, TransferState</a></li><li class="toc-h2"><a href="#see-also">See also</a></li></ul></aside>
   </main>
 </div>
 <footer class="site-footer">
   <div><strong>SipLLM</strong> — Run GGUF models larger than available RAM through bounded-memory transformer layer streaming. Performance figures are <em>measured</em>
   (Apple&nbsp;M3, warm cache, median-of-3 unless noted) and reproducible via
   <code>scripts/bench.sh</code>; raw JSON in <code>bench/results/</code>. Unmeasured metrics are marked N/A.</div>
-  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.4.0 · portal v0.5</div>
+  <div class="footer-meta">Dependency-free C++17 · CPU-first · offline-first · v0.7.0</div>
 </footer>
 <script src="assets/search-index.js"></script>
 <script src="assets/app.js"></script>
